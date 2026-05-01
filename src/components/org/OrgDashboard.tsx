@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Calendar as CalendarIcon, Clock, MapPin, Users, Hotel, Briefcase, Check } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, Users, Hotel, Briefcase, Check, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, organizationsApi, applicationsApi } from '../../services/api';
 import { JobCalendar } from './JobCalendar';
