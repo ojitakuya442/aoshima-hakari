@@ -26,9 +26,11 @@ const getColorForJob = (job: Job) => {
 export function JobCalendar({
   jobs,
   onSelectDate,
+  selectedDate,
 }: {
   jobs: Job[];
   onSelectDate: (date: string, jobs: Job[]) => void;
+  selectedDate?: string | null;
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isEditingHolidays, setIsEditingHolidays] = useState(false);
@@ -138,22 +140,26 @@ export function JobCalendar({
                 setHolidayName('休業日');
                 setHolidayModal({ isOpen: true, dateStr });
               }
-            } else if (dayJobs.length > 0) {
+            } else {
               onSelectDate(dateStr, dayJobs);
             }
           };
+
+          const isSelected = selectedDate === dateStr;
 
           return (
             <button
               key={day}
               onClick={handleDayClick}
-              className={`min-h-[100px] p-2 rounded-lg border transition-colors text-left flex flex-col relative ${
-                isEditingHolidays
-                  ? 'hover:border-red-400 cursor-pointer'
+              className={`min-h-[100px] p-2 rounded-lg border transition-all text-left flex flex-col relative cursor-pointer ${
+                isSelected
+                  ? 'ring-2 ring-slate-800 border-slate-800 shadow-md z-10 bg-white'
+                  : isEditingHolidays
+                  ? 'hover:border-red-400'
                   : dayJobs.length > 0
-                  ? 'border-blue-300 bg-blue-50 hover:bg-blue-100 cursor-pointer'
-                  : 'border-slate-200 hover:bg-slate-50'
-              } ${isToday ? 'ring-2 ring-blue-500' : ''} ${bgColor}`}
+                  ? 'border-blue-300 bg-blue-50 hover:bg-blue-100'
+                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              } ${isToday && !isSelected ? 'ring-2 ring-blue-500' : ''} ${!isSelected ? bgColor : ''}`}
             >
               <div className="flex justify-between items-start mb-1">
                 <div className={`text-lg font-bold ${dayColor}`}>{day}</div>
