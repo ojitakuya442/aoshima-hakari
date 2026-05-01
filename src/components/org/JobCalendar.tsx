@@ -111,26 +111,29 @@ export function JobCalendar({
             <button
               key={day}
               onClick={() => dayJobs.length > 0 && onSelectDate(dateStr, dayJobs)}
-              className={`aspect-square p-2 rounded-lg border transition-colors ${
+              className={`min-h-[100px] p-2 rounded-lg border transition-colors text-left flex flex-col ${
                 dayJobs.length > 0
                   ? 'border-blue-300 bg-blue-50 hover:bg-blue-100 cursor-pointer'
                   : 'border-slate-200 hover:bg-slate-50'
               } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
             >
-              <div className={`text-sm font-medium ${dayColor}`}>{day}</div>
+              <div className={`text-sm font-medium ${dayColor} mb-1`}>{day}</div>
               {dayJobs.length > 0 && (
-                <div className="mt-1 flex flex-col items-center">
-                  <div className="flex flex-wrap gap-1 justify-center mb-1">
-                    {dayJobs.slice(0, 3).map(job => (
-                      <div key={job.id} className={`w-2 h-2 rounded-full ${getColorForJob(job)}`} title={job.title} />
-                    ))}
-                    {dayJobs.length > 3 && (
-                      <div className="text-[10px] leading-none text-slate-500 font-bold ml-0.5">+</div>
-                    )}
-                  </div>
-                  <div className="text-xs font-semibold text-blue-600">
-                    {dayJobs.length}件
-                  </div>
+                <div className="flex-1 flex flex-col gap-1 w-full overflow-hidden">
+                  {dayJobs.slice(0, 2).map(job => (
+                    <div 
+                      key={job.id} 
+                      className={`text-[10px] leading-tight px-1.5 py-1 rounded truncate text-white ${getColorForJob(job)}`}
+                      title={job.title}
+                    >
+                      {job.title}
+                    </div>
+                  ))}
+                  {dayJobs.length > 2 && (
+                    <div className="text-[10px] font-semibold text-slate-500 mt-auto pl-1">
+                      ＋他 {dayJobs.length - 2} 件
+                    </div>
+                  )}
                 </div>
               )}
             </button>

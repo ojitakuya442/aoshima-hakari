@@ -3,6 +3,7 @@ import { Plus, Calendar as CalendarIcon, Clock, MapPin, Users, Hotel, Briefcase,
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, organizationsApi, applicationsApi } from '../../services/api';
 import { JobCalendar } from './JobCalendar';
+import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
@@ -16,15 +17,18 @@ export function OrgDashboard({
   const { user } = useAuth();
   const [jobs, setJobs] = useState<any[]>([]);
   const [jobApplicationCounts, setJobApplicationCounts] = useState<Record<string, number>>({});
-  const [stats, setStats] = useState({ recruiting: 0, pending: 0, confirmed: 0 });
+  const [stats, setStats] = useState({ draft: 0, open: 0, confirmed: 0 });
   const [loading, setLoading] = useState(true);
   const [showCalendar, setShowCalendar] = useState(false);
   const [selectedDateJobs, setSelectedDateJobs] = useState<any[] | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const [filterDate, setFilterDate] = useState('');
-  const [filterArea, setFilterArea] = useState('');
+  const [filterRegion, setFilterRegion] = useState('all');
+  const [filterPrefecture, setFilterPrefecture] = useState('all');
+  const [filterCity, setFilterCity] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSort, setFilterSort] = useState('created_desc');
 
   useEffect(() => {
     loadData();
@@ -51,10 +55,11 @@ export function OrgDashboard({
 
         setJobApplicationCounts(counts);
 
-        const recruitingCount = jobsData?.filter((j) => j.status === 'open').length || 0;
+        const draftCount = jobsData?.filter((j) => j.status === 'draft').length || 0;
+        const openCount = jobsData?.filter((j) => j.status === 'open').length || 0;
         const confirmedCount = jobsData?.filter((j) => j.status === 'confirmed').length || 0;
 
-        setStats({ recruiting: recruitingCount, pending: totalPending, confirmed: confirmedCount });
+        setStats({ draft: draftCount, open: openCount, confirmed: confirmedCount });
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -112,11 +117,11 @@ export function OrgDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">募集中</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.recruiting}</p>
+              <p className="text-sm text-slate-600 mb-1">募集前</p>
+              <p className="text-3xl font-bold text-slate-900">{stats.draft}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              <FileText className="w-6 h-6 text-slate-600" />
             </div>
           </div>
         </div>
@@ -124,11 +129,11 @@ export function OrgDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">応募待ち</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.pending}</p>
+              <p className="text-sm text-slate-600 mb-1">募集中</p>
+              <p className="text-3xl font-bold text-slate-900">{stats.open}</p>
             </div>
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-              <Clock className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Briefcase className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </div>
@@ -176,7 +181,7 @@ export function OrgDashboard({
                             : 'bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {job.status === 'open' ? '募集中' : job.status === 'confirmed' ? '確定済み' : job.status === 'pre-open' ? '募集前' : job.status}
+                        {job.status === 'open' ? '募集中' : job.status === 'confirmed' ? '確定済み' : job.status === 'draft' ? '募集前' : job.status}
                       </span>
                       <button
                         onClick={() => onSelectJob(job.id)}
@@ -205,12 +210,36 @@ export function OrgDashboard({
                 className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 title="日付で絞り込み"
               />
+              <select
+                value={filterRegion}
+                onChange={(e) => {
+                  setFilterRegion(e.target.value);
+                  setFilterPrefecture('all');
+                }}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value="all">すべての地方</option>
+                {Object.keys(REGIONS).map(region => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+              <select
+                value={filterPrefecture}
+                onChange={(e) => setFilterPrefecture(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                disabled={filterRegion !== 'all' && !REGIONS[filterRegion]}
+              >
+                <option value="all">すべての都道府県</option>
+                {(filterRegion === 'all' ? Object.values(REGIONS).flat() : REGIONS[filterRegion] || []).map(pref => (
+                  <option key={pref} value={pref}>{pref}</option>
+                ))}
+              </select>
               <input
                 type="text"
-                placeholder="エリア（都道府県・市）"
-                value={filterArea}
-                onChange={(e) => setFilterArea(e.target.value)}
-                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-40"
+                placeholder="市区町村を入力"
+                value={filterCity}
+                onChange={(e) => setFilterCity(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-32"
               />
               <select
                 value={filterStatus}
@@ -218,9 +247,18 @@ export function OrgDashboard({
                 className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
               >
                 <option value="all">すべてのステータス</option>
-                <option value="pre-open">募集前</option>
+                <option value="draft">募集前</option>
                 <option value="open">募集中</option>
                 <option value="confirmed">確定済み</option>
+              </select>
+              <select
+                value={filterSort}
+                onChange={(e) => setFilterSort(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value="created_desc">新着順</option>
+                <option value="inspection_asc">開催日が近い順</option>
+                <option value="inspection_desc">開催日が遠い順</option>
               </select>
             </div>
           </div>
@@ -233,9 +271,19 @@ export function OrgDashboard({
           <div className="divide-y divide-slate-200">
             {jobs.filter(job => {
               if (filterDate && job.inspection_date !== filterDate) return false;
-              if (filterArea && !((job.prefecture && job.prefecture.includes(filterArea)) || (job.city && job.city.includes(filterArea)))) return false;
+              if (filterRegion !== 'all') {
+                const prefecturesInRegion = REGIONS[filterRegion] || [];
+                if (!prefecturesInRegion.includes(job.prefecture)) return false;
+              }
+              if (filterPrefecture !== 'all' && job.prefecture !== filterPrefecture) return false;
+              if (filterCity && !job.city?.includes(filterCity)) return false;
               if (filterStatus !== 'all' && job.status !== filterStatus) return false;
               return true;
+            }).sort((a, b) => {
+              if (filterSort === 'inspection_asc') return a.inspection_date.localeCompare(b.inspection_date);
+              if (filterSort === 'inspection_desc') return b.inspection_date.localeCompare(a.inspection_date);
+              if (filterSort === 'created_desc') return b.created_at.localeCompare(a.created_at);
+              return 0;
             }).map((job) => {
               const applicationCount = jobApplicationCounts[job.id] || 0;
               const getStatusBadge = () => {
@@ -251,7 +299,7 @@ export function OrgDashboard({
                       募集中
                     </span>
                   );
-                } else if (job.status === 'pre-open') {
+                } else if (job.status === 'draft') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
                       募集前
@@ -267,7 +315,7 @@ export function OrgDashboard({
               };
 
               return (
-                <div key={job.id} className="p-6 hover:bg-slate-50 transition-colors">
+                <div key={job.id} onClick={() => onSelectJob(job.id)} className="p-6 cursor-pointer hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-3">
@@ -309,7 +357,7 @@ export function OrgDashboard({
                     <div className="flex space-x-2">
                       {applicationCount > 0 && (
                         <button
-                          onClick={() => handleViewApplications(job.id)}
+                          onClick={(e) => { e.stopPropagation(); handleViewApplications(job.id); }}
                           className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors flex items-center space-x-2"
                         >
                           <Users className="w-4 h-4" />
@@ -317,7 +365,7 @@ export function OrgDashboard({
                         </button>
                       )}
                       <button
-                        onClick={() => onSelectJob(job.id)}
+                        onClick={(e) => { e.stopPropagation(); onSelectJob(job.id); }}
                         className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         詳細

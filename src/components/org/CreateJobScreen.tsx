@@ -22,7 +22,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     city: '',
     reward: '',
     required_qualifications: '',
-    visibility: 'local' as 'local' | 'public' | 'progressive',
+    visibility: 'local' as 'local' | 'public',
     inspector_count: '1',
     accommodation_required: false,
     recruitment_start_date: '',
@@ -286,11 +286,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
             >
               <option value="local">地域限定公開</option>
               <option value="public">全体公開</option>
-              <option value="progressive">段階的拡大公開</option>
             </select>
-            <p className="mt-2 text-sm text-slate-500">
-              段階的拡大公開を選択すると、応募が集まらない場合に自動で公開範囲が拡大されます
-            </p>
           </div>
 
           <div>

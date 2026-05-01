@@ -13,14 +13,13 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
   const [success, setSuccess] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [organizationName, setOrganizationName] = useState('');
   const [formData, setFormData] = useState({
-    full_name: '',
+    full_name: '',       // 検定官: 氏名 / 組織: 担当者名
     phone: '',
     address: '',
     experience: '',
     skills: '',
-    organization_name: '',
-    description: '',
   });
 
   useEffect(() => {
@@ -38,8 +37,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
       address: profile.address || '',
       experience: '',
       skills: '',
-      organization_name: '',
-      description: '',
     });
 
     try {
@@ -55,11 +52,7 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
       } else {
         const org = await organizationsApi.getByUserId(user.id);
         if (org) {
-          setFormData((prev) => ({
-            ...prev,
-            organization_name: org.organization_name || '',
-            description: org.description || '',
-          }));
+          setOrganizationName(org.organization_name || '');
         }
       }
     } catch (error) {
@@ -127,15 +120,8 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
             skills: formData.skills,
           });
         }
-      } else if (profile?.role === 'organization' && user) {
-        const org = await organizationsApi.getByUserId(user.id);
-        if (org) {
-          await organizationsApi.update(org.id, {
-            organization_name: formData.organization_name,
-            description: formData.description,
-          });
-        }
       }
+      // 組織名は変更不可のため、organization の update は不要
 
       setSuccess(true);
     } catch (err) {
@@ -194,9 +180,25 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
           </div>
 
           <div className="flex-1 space-y-4">
+            {/* 組織ユーザーのみ: 組織名（変更不可）を最上段に表示 */}
+            {profile?.role === 'organization' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  組織名
+                </label>
+                <input
+                  type="text"
+                  value={organizationName}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed"
+                  disabled
+                />
+                <p className="mt-1 text-xs text-slate-400">組織名は変更できません</p>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                {profile?.role === 'organization' ? '組織名' : '氏名'}
+                {profile?.role === 'organization' ? '担当者名' : '氏名'}
               </label>
               <input
                 type="text"
@@ -262,21 +264,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
                 rows={3}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 placeholder="得意分野、特技など..."
-              ></textarea>
-            </div>
-          </div>
-        )}
-
-        {profile?.role === 'organization' && (
-          <div className="border-t border-slate-200 pt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">組織概要</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={4}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                placeholder="組織の説明を入力してください"
               ></textarea>
             </div>
           </div>

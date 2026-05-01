@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Calendar, Clock, MapPin, DollarSign, FileText, Check, Briefcase } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, applicationsApi, inspectorsApi } from '../../services/api';
+import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
@@ -16,21 +17,25 @@ export function InspectorDashboard({
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedPrefecture, setSelectedPrefecture] = useState('すべての地域');
-  const [stats, setStats] = useState({ recruiting: 0, pending: 0, confirmed: 0 });
+  const [filterRegion, setFilterRegion] = useState('all');
+  const [filterPrefecture, setFilterPrefecture] = useState('all');
+  const [filterCity, setFilterCity] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterSort, setFilterSort] = useState('created_desc');
+  const [stats, setStats] = useState({ draft: 0, open: 0, confirmed: 0 });
   const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set());
   const [applicationStatuses, setApplicationStatuses] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadData();
-  }, [user, selectedPrefecture]);
+  }, [user]);
 
   const loadData = async () => {
     if (!user) return;
 
     try {
       const [jobsData, inspector] = await Promise.all([
-        jobsApi.getOpenJobs(selectedPrefecture === 'すべての地域' ? undefined : selectedPrefecture),
+        jobsApi.getAll(),
         inspectorsApi.getByUserId(user.id),
       ]);
 
@@ -50,9 +55,11 @@ export function InspectorDashboard({
         });
         setApplicationStatuses(statuses);
 
-        const recruitingCount = (jobsData || []).filter((job: any) => !appliedIds.has(job.id)).length;
+        const draftCount = (jobsData || []).filter((job: any) => job.status === 'draft').length;
+        const openCount = (jobsData || []).filter((job: any) => job.status === 'open').length;
+        const confirmedJobCount = (jobsData || []).filter((job: any) => job.status === 'confirmed').length;
 
-        setStats({ recruiting: recruitingCount, pending: pendingCount, confirmed: confirmedCount });
+        setStats({ draft: draftCount, open: openCount, confirmed: confirmedJobCount });
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -61,10 +68,24 @@ export function InspectorDashboard({
     }
   };
 
-  const filteredJobs = jobs.filter((job) =>
-    job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    job.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredJobs = jobs.filter((job) => {
+    if (searchTerm && !(job.title.toLowerCase().includes(searchTerm.toLowerCase()) || job.description.toLowerCase().includes(searchTerm.toLowerCase()))) return false;
+    if (filterRegion !== 'all') {
+      const prefecturesInRegion = REGIONS[filterRegion] || [];
+      if (!prefecturesInRegion.includes(job.prefecture)) return false;
+    }
+    if (filterPrefecture !== 'all' && job.prefecture !== filterPrefecture) return false;
+    if (filterCity && !job.city?.includes(filterCity)) return false;
+    if (filterStatus !== 'all' && job.status !== filterStatus) return false;
+    // Don't show jobs that are already completed or cancelled by default, unless maybe filtered?
+    if (filterStatus === 'all' && ['completed', 'cancelled'].includes(job.status)) return false;
+    return true;
+  }).sort((a, b) => {
+    if (filterSort === 'inspection_asc') return a.inspection_date.localeCompare(b.inspection_date);
+    if (filterSort === 'inspection_desc') return b.inspection_date.localeCompare(a.inspection_date);
+    if (filterSort === 'created_desc') return b.created_at.localeCompare(a.created_at);
+    return 0;
+  });
 
   if (loading) {
     return (
@@ -80,8 +101,8 @@ export function InspectorDashboard({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-4">検定官ダッシュボード</h1>
-        <div className="flex space-x-4">
-          <div className="flex-1">
+        <div className="flex flex-wrap gap-4">
+          <div className="flex-1 min-w-[200px]">
             <input
               type="text"
               placeholder="キーワードで検索..."
@@ -91,16 +112,54 @@ export function InspectorDashboard({
             />
           </div>
           <select
-            value={selectedPrefecture}
-            onChange={(e) => setSelectedPrefecture(e.target.value)}
+            value={filterRegion}
+            onChange={(e) => {
+              setFilterRegion(e.target.value);
+              setFilterPrefecture('all');
+            }}
             className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
           >
-            <option>すべての地域</option>
-            <option>東京都</option>
-            <option>神奈川県</option>
-            <option>千葉県</option>
-            <option>埼玉県</option>
-            <option>大阪府</option>
+            <option value="all">すべての地方</option>
+            {Object.keys(REGIONS).map(region => (
+              <option key={region} value={region}>{region}</option>
+            ))}
+          </select>
+          <select
+            value={filterPrefecture}
+            onChange={(e) => setFilterPrefecture(e.target.value)}
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            disabled={filterRegion !== 'all' && !REGIONS[filterRegion]}
+          >
+            <option value="all">すべての都道府県</option>
+            {(filterRegion === 'all' ? Object.values(REGIONS).flat() : REGIONS[filterRegion] || []).map(pref => (
+              <option key={pref} value={pref}>{pref}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            placeholder="市区町村を入力"
+            value={filterCity}
+            onChange={(e) => setFilterCity(e.target.value)}
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent w-40"
+          />
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+          >
+            <option value="all">すべてのステータス</option>
+            <option value="draft">募集前</option>
+            <option value="open">募集中</option>
+            <option value="confirmed">確定済み</option>
+          </select>
+          <select
+            value={filterSort}
+            onChange={(e) => setFilterSort(e.target.value)}
+            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+          >
+            <option value="created_desc">新着順</option>
+            <option value="inspection_asc">開催日が近い順</option>
+            <option value="inspection_desc">開催日が遠い順</option>
           </select>
         </div>
       </div>
@@ -109,11 +168,11 @@ export function InspectorDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">募集中</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.recruiting}</p>
+              <p className="text-sm text-slate-600 mb-1">募集前</p>
+              <p className="text-3xl font-bold text-slate-900">{stats.draft}</p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+              <FileText className="w-6 h-6 text-slate-600" />
             </div>
           </div>
         </div>
@@ -121,11 +180,11 @@ export function InspectorDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">応募待ち</p>
-              <p className="text-3xl font-bold text-slate-900">{stats.pending}</p>
+              <p className="text-sm text-slate-600 mb-1">募集中</p>
+              <p className="text-3xl font-bold text-slate-900">{stats.open}</p>
             </div>
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
-              <Clock className="w-6 h-6 text-amber-600" />
+            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+              <Briefcase className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </div>
@@ -175,6 +234,13 @@ export function InspectorDashboard({
                     </span>
                   );
                 } else {
+                  if (job.status === 'draft') {
+                    return (
+                      <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
+                        募集前
+                      </span>
+                    );
+                  }
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-700 font-medium">
                       募集中
@@ -184,7 +250,7 @@ export function InspectorDashboard({
               };
 
               return (
-                <div key={job.id} className="p-6 hover:bg-slate-50 transition-colors">
+                <div key={job.id} onClick={() => onSelectJob(job.id)} className="p-6 cursor-pointer hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
@@ -216,7 +282,7 @@ export function InspectorDashboard({
                       </div>
                     </div>
                     <button
-                      onClick={() => onSelectJob(job.id)}
+                      onClick={(e) => { e.stopPropagation(); onSelectJob(job.id); }}
                       className="px-6 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                     >
                       詳細
