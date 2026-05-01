@@ -250,6 +250,8 @@ export const filesApi = {
       uploaded_by_role: 'organization',
       access_level: 'public',
       file_category: 'recruitment',
+      viewable_from: null,
+      viewable_until: null,
     });
   },
 
@@ -261,6 +263,8 @@ export const filesApi = {
       uploaded_by_role: 'organization' | 'inspector';
       access_level: 'public' | 'confirmed';
       file_category: 'recruitment' | 'submission';
+      viewable_from?: string | null;
+      viewable_until?: string | null;
     }
   ) {
     await delay();
@@ -272,6 +276,8 @@ export const filesApi = {
       file_path: `${jobId}/${file.name}`,
       file_size: file.size,
       file_type: file.type,
+      viewable_from: metadata.viewable_from || null,
+      viewable_until: metadata.viewable_until || null,
       created_at: stamp(),
       ...metadata,
     };

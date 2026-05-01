@@ -26,6 +26,9 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     inspector_count: '1',
     accommodation_required: false,
     recruitment_start_date: '',
+    file_access_level: 'public' as 'public' | 'confirmed',
+    file_viewable_from: '',
+    file_viewable_until: '',
   });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,8 +92,10 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
           try {
             await filesApi.uploadWithMetadata(file, job.id, user.id, {
               uploaded_by_role: 'organization',
-              access_level: 'public',
+              access_level: formData.file_access_level,
               file_category: 'recruitment',
+              viewable_from: formData.file_viewable_from || null,
+              viewable_until: formData.file_viewable_until || null,
             });
           } catch (fileError) {
             console.error('Failed to upload file:', file.name, fileError);
@@ -289,19 +294,6 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              必要資格・スキル
-            </label>
-            <input
-              type="text"
-              value={formData.required_qualifications}
-              onChange={(e) => setFormData({ ...formData, required_qualifications: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-              placeholder="例: 建築士資格、検定経験3年以上"
-            />
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -316,11 +308,11 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                 required
               />
             </div>
-            <div>
+            <div className="flex flex-col justify-center">
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 宿泊
               </label>
-              <div className="flex items-center h-full">
+              <div className="flex items-center">
                 <label className="flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -336,9 +328,9 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              検定資料のアップロード（募集期間中から閲覧可能）
+              検定資料のアップロード
             </label>
-            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6">
+            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 mb-6">
               <div className="text-center">
                 <Upload className="mx-auto h-12 w-12 text-slate-400" />
                 <div className="mt-4">
@@ -387,9 +379,35 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                 </div>
               )}
             </div>
-            <p className="mt-2 text-sm text-slate-500">
-              後日追加アップロードも可能です
-            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  閲覧開始日時
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.file_viewable_from}
+                  onChange={(e) => setFormData({ ...formData, file_viewable_from: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  閲覧終了日時
+                </label>
+                <input
+                  type="datetime-local"
+                  value={formData.file_viewable_until}
+                  onChange={(e) => setFormData({ ...formData, file_viewable_until: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                />
+              </div>
+              <div className="md:col-span-2 text-sm text-slate-500 mt-[-8px]">
+                ※ 未指定の場合は、案件作成時点から無期限で閲覧可能になります。<br/>
+                ※ 後日追加アップロードも可能です。
+              </div>
+            </div>
           </div>
 
           <div className="flex justify-end space-x-4 pt-6">

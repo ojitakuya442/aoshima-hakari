@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Check, X, User, RefreshCcw, AlertCircle } from 'lucide-react';
-import { applicationsApi, jobsApi, notificationsApi } from '../../services/api';
+import { Check, X, User, RefreshCcw, AlertCircle, MessageSquare, Send, Info } from 'lucide-react';
+import { applicationsApi, jobsApi, notificationsApi, messagesApi } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
@@ -11,10 +12,15 @@ export function ApplicationsScreen({
   jobId: string | null;
   onNavigate: (screen: Screen) => void;
 }) {
+  const { user } = useAuth();
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRejected, setShowRejected] = useState(false);
   const [job, setJob] = useState<any>(null);
+  const [detailApp, setDetailApp] = useState<any>(null);
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [sendingInquiry, setSendingInquiry] = useState(false);
+  const [inquirySent, setInquirySent] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -195,72 +201,139 @@ export function ApplicationsScreen({
         ) : (
           <div className="divide-y divide-slate-200">
             {pendingApplications.map((app: any) => (
-              <div key={app.id} className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-4">
-                    <div className="w-12 h-12 bg-slate-200 rounded-full flex items-center justify-center">
-                      <User className="w-6 h-6 text-slate-600" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-900">
-                        {app.inspectors?.profiles?.full_name}
-                      </h3>
-                      <p className="text-sm text-slate-600">
-                        {app.inspectors?.profiles?.email}
-                      </p>
-                      {app.inspectors?.qualifications && (
-                        <div className="mt-2">
-                          <p className="text-sm font-medium text-slate-700">保有資格:</p>
-                          <p className="text-sm text-slate-600">{app.inspectors.qualifications}</p>
-                        </div>
-                      )}
-                      {app.inspectors?.experience && (
-                        <div className="mt-1">
-                          <p className="text-sm font-medium text-slate-700">経験:</p>
-                          <p className="text-sm text-slate-600">{app.inspectors.experience}</p>
-                        </div>
-                      )}
-                      {app.message && (
-                        <div className="mt-2 p-3 bg-slate-50 rounded-lg">
-                          <p className="text-sm font-medium text-slate-700 mb-1">応募メッセージ:</p>
-                          <p className="text-sm text-slate-700">{app.message}</p>
-                        </div>
-                      )}
-                      <p className="mt-2 text-sm text-slate-500">
-                        応募日: {new Date(app.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
+              <div key={app.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0">
+                    <User className="w-5 h-5 text-slate-600" />
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {app.status === 'pending' ? (
-                      <>
-                        <button
-                          onClick={() => handleConfirm(app.id)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                        >
-                          <Check className="w-4 h-4" />
-                          <span>確定</span>
-                        </button>
-                        <button
-                          onClick={() => handleReject(app.id)}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-2"
-                        >
-                          <X className="w-4 h-4" />
-                          <span>辞退</span>
-                        </button>
-                      </>
-                    ) : (
-                      <span className="px-4 py-2 rounded-full text-sm bg-green-100 text-green-700">
-                        確定済み
-                      </span>
-                    )}
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">
+                      {app.inspectors?.profiles?.full_name || '—'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      応募日: {new Date(app.created_at).toLocaleDateString('ja-JP')}
+                    </p>
                   </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setDetailApp(app);
+                      setInquiryMessage('');
+                      setInquirySent(false);
+                    }}
+                    className="px-3 py-1.5 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors flex items-center space-x-1 text-sm"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>詳細</span>
+                  </button>
+                  {app.status === 'pending' ? (
+                    <>
+                      <button
+                        onClick={() => handleConfirm(app.id)}
+                        className="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-1 text-sm"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        <span>確定</span>
+                      </button>
+                      <button
+                        onClick={() => handleReject(app.id)}
+                        className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center space-x-1 text-sm"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>辞退</span>
+                      </button>
+                    </>
+                  ) : (
+                    <span className="px-3 py-1.5 rounded-full text-sm bg-green-100 text-green-700">確定済み</span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* パターン3: 応募者詳細ポップアップ */}
+      {detailApp && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-bold text-slate-900">応募者詳細</h2>
+              <button onClick={() => setDetailApp(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="w-14 h-14 bg-slate-200 rounded-full flex items-center justify-center">
+                  <User className="w-7 h-7 text-slate-600" />
+                </div>
+                <div>
+                  <p className="text-lg font-bold text-slate-900">{detailApp.inspectors?.profiles?.full_name || '—'}</p>
+                  <p className="text-sm text-slate-500">{detailApp.inspectors?.profiles?.email}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">応募日: {new Date(detailApp.created_at).toLocaleDateString('ja-JP')}</p>
+                </div>
+              </div>
+              {detailApp.message && (
+                <div className="bg-slate-50 rounded-lg p-4">
+                  <p className="text-xs text-slate-500 mb-1">応募メッセージ</p>
+                  <p className="text-sm text-slate-800">{detailApp.message}</p>
+                </div>
+              )}
+              <div className="border-t border-slate-200 pt-4">
+                <h3 className="font-semibold text-slate-900 mb-2 flex items-center space-x-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>この応募者に問合せる</span>
+                </h3>
+                {inquirySent ? (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-800 text-sm font-semibold">問合せを送信しました</p>
+                    <button
+                      onClick={() => { setDetailApp(null); onNavigate('messages'); }}
+                      className="mt-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    >
+                      メッセージ画面へ
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <textarea
+                      value={inquiryMessage}
+                      onChange={(e) => setInquiryMessage(e.target.value)}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 text-sm"
+                      placeholder="問合せ内容を入力してください"
+                    />
+                    <div className="flex justify-end">
+                      <button
+                        onClick={async () => {
+                          if (!inquiryMessage.trim() || !user || !jobId) return;
+                          setSendingInquiry(true);
+                          try {
+                            await messagesApi.send({ job_id: jobId, sender_id: user.id, content: inquiryMessage.trim() });
+                            setInquirySent(true);
+                          } catch (e) {
+                            console.error(e);
+                            alert('送信に失敗しました');
+                          } finally {
+                            setSendingInquiry(false);
+                          }
+                        }}
+                        disabled={sendingInquiry || !inquiryMessage.trim()}
+                        className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400 flex items-center space-x-2 text-sm"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{sendingInquiry ? '送信中...' : '問合せを送信'}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

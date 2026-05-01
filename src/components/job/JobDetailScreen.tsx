@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, DollarSign, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel, Trash2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, DollarSign, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel, Trash2, Settings, Briefcase, List, MessageSquare, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, applicationsApi, inspectorsApi, auditLogsApi, filesApi } from '../../services/api';
 import { supabase } from '../../lib/supabase';
@@ -27,6 +27,9 @@ export function JobDetailScreen({
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [applicationStatus, setApplicationStatus] = useState<string | null>(null);
+  const [inquiryMessage, setInquiryMessage] = useState('');
+  const [sendingInquiry, setSendingInquiry] = useState(false);
+  const [inquirySent, setInquirySent] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -347,7 +350,10 @@ export function JobDetailScreen({
 
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900 mb-2">{job.title}</h2>
+            <div className="flex items-center space-x-3 mb-2">
+              {job.job_number && <span className="text-slate-500 font-medium">{job.job_number}</span>}
+              <h2 className="text-2xl font-bold text-slate-900">{job.title}</h2>
+            </div>
             <p className="text-slate-600">{job.organizations?.organization_name}</p>
           </div>
           <span
@@ -375,7 +381,7 @@ export function JobDetailScreen({
             <div className="flex items-start space-x-3">
               <Clock className="w-5 h-5 text-slate-400 mt-0.5" />
               <div>
-                <p className="text-sm text-slate-600">実施時間</p>
+                <p className="text-sm text-slate-600">開始時間</p>
                 <p className="font-semibold text-slate-900">
                   {job.start_time} 〜 {job.end_time}
                 </p>
@@ -389,10 +395,22 @@ export function JobDetailScreen({
                   onClick={openInMaps}
                   className="font-semibold text-slate-900 hover:text-blue-600 transition-colors text-left group flex items-center space-x-2"
                 >
-                  <span>{job.prefecture} {job.city}</span>
+                  <span>{job.prefecture} {job.city || ''}</span>
                   <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
                 <p className="text-sm text-slate-600 mt-1">{job.location}</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <Settings className="w-5 h-5 text-slate-400 mt-0.5" />
+              <div>
+                <p className="text-sm text-slate-600">検定機械台数</p>
+                <p className="font-semibold text-slate-900">
+                  SSV機 {job.machine_counts?.ssv || 0}台　SV機 {job.machine_counts?.sv || 0}台　他社機 {job.machine_counts?.other || 0}台　旧型機 {job.machine_counts?.old || 0}台
+                </p>
+                <p className="text-sm text-slate-500 mt-1">
+                  （内訳：型式指定 {job.machine_counts?.certified || 0}台　既存 {job.machine_counts?.existing || 0}台）
+                </p>
               </div>
             </div>
           </div>
@@ -410,7 +428,7 @@ export function JobDetailScreen({
             <div className="flex items-start space-x-3">
               <Users className="w-5 h-5 text-slate-400 mt-0.5" />
               <div>
-                <p className="text-sm text-slate-600">必要人数</p>
+                <p className="text-sm text-slate-600">募集人数</p>
                 <p className="font-semibold text-slate-900">
                   {job.inspector_count}名
                 </p>
@@ -420,22 +438,31 @@ export function JobDetailScreen({
               <Hotel className="w-5 h-5 text-slate-400 mt-0.5" />
               <div>
                 <p className="text-sm text-slate-600">宿泊</p>
-                <p className={`font-semibold ${job.accommodation_required ? 'text-blue-600' : 'text-slate-900'}`}>
-                  {job.accommodation_required ? '宿泊あり' : '宿泊なし'}
+                <p className={`font-semibold ${job.accommodation !== 'none' ? 'text-blue-600' : 'text-slate-900'}`}>
+                  {job.accommodation === 'before' ? '宿泊（前泊）' :
+                   job.accommodation === 'after' ? '宿泊（後泊）' :
+                   job.accommodation === 'both' ? '宿泊（前後泊）' : '宿泊なし'}
                 </p>
               </div>
             </div>
-            {job.required_qualifications && (
-              <div className="flex items-start space-x-3">
-                <FileText className="w-5 h-5 text-slate-400 mt-0.5" />
-                <div>
-                  <p className="text-sm text-slate-600">必要資格</p>
-                  <p className="font-semibold text-slate-900">
-                    {job.required_qualifications}
-                  </p>
-                </div>
+            <div className="flex items-start space-x-3">
+              <Briefcase className="w-5 h-5 text-slate-400 mt-0.5" />
+              <div>
+                <p className="text-sm text-slate-600">検定実施回数</p>
+                <p className="font-semibold text-slate-900">
+                  {job.inspection_count === 'first' ? '初回' : job.inspection_count === 'second_or_later' ? '2回目以降' : '未定'}
+                </p>
               </div>
-            )}
+            </div>
+            <div className="flex items-start space-x-3">
+              <List className="w-5 h-5 text-slate-400 mt-0.5" />
+              <div>
+                <p className="text-sm text-slate-600">要持参品</p>
+                <p className="font-semibold text-slate-900">
+                  {job.required_items?.length ? job.required_items.join('、') : '特になし'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -663,6 +690,62 @@ export function JobDetailScreen({
                     className="px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400"
                   >
                     {applying ? '応募中...' : 'この案件に応募する'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* パターン1: 検定官からの問合せ入力 */}
+        {profile?.role === 'inspector' && (
+          <div className="border-t border-slate-200 pt-6 mt-6">
+            <h3 className="font-semibold text-slate-900 mb-3 flex items-center space-x-2">
+              <MessageSquare className="w-5 h-5 text-slate-600" />
+              <span>検定機関への問合せ</span>
+            </h3>
+            {inquirySent ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-green-800 font-semibold">問合せを送信しました</p>
+                <p className="text-sm text-green-700 mt-1">メッセージ画面からやり取りを続けられます</p>
+                <button
+                  onClick={() => onNavigate('messages')}
+                  className="mt-3 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                >
+                  メッセージ画面へ
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <textarea
+                  value={inquiryMessage}
+                  onChange={(e) => setInquiryMessage(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  placeholder="検定機関への質問や問合せ内容を入力してください"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={async () => {
+                      if (!inquiryMessage.trim() || !user || !jobId) return;
+                      setSendingInquiry(true);
+                      try {
+                        const { messagesApi } = await import('../../services/api');
+                        await messagesApi.send({ job_id: jobId, sender_id: user.id, content: inquiryMessage.trim() });
+                        setInquirySent(true);
+                        setInquiryMessage('');
+                      } catch (e) {
+                        console.error('Failed to send inquiry:', e);
+                        alert('送信に失敗しました');
+                      } finally {
+                        setSendingInquiry(false);
+                      }
+                    }}
+                    disabled={sendingInquiry || !inquiryMessage.trim()}
+                    className="px-5 py-2.5 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400 flex items-center space-x-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>{sendingInquiry ? '送信中...' : '問合せを送信'}</span>
                   </button>
                 </div>
               </div>

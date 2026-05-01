@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Search, Paperclip, CheckCheck } from 'lucide-react';
+import { Send, Search, Paperclip, CheckCheck, Plus, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi, jobsApi, applicationsApi, inspectorsApi, organizationsApi, auditLogsApi } from '../../services/api';
 
@@ -16,10 +16,41 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
   const [error, setError] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showNewRoomModal, setShowNewRoomModal] = useState(false);
+  const [newRoomJobId, setNewRoomJobId] = useState('');
+  const [newRoomInspectorId, setNewRoomInspectorId] = useState('');
+  const [newRoomMessage, setNewRoomMessage] = useState('');
+  const [creatingRoom, setCreatingRoom] = useState(false);
+  const [allJobs, setAllJobs] = useState<any[]>([]);
+  const [jobApplicants, setJobApplicants] = useState<any[]>([]);
+  const [loadingApplicants, setLoadingApplicants] = useState(false);
 
   useEffect(() => {
     loadJobs();
   }, [user, profile]);
+
+  // 案件が選択されたとき、その案件の応募者を取得（検定機関向け）
+  useEffect(() => {
+    if (!newRoomJobId || profile?.role !== 'organization') {
+      setJobApplicants([]);
+      setNewRoomInspectorId('');
+      return;
+    }
+    const fetchApplicants = async () => {
+      setLoadingApplicants(true);
+      try {
+        const apps = await applicationsApi.getByJob(newRoomJobId);
+        setJobApplicants(apps || []);
+        setNewRoomInspectorId('');
+      } catch (e) {
+        console.error('Failed to fetch applicants:', e);
+        setJobApplicants([]);
+      } finally {
+        setLoadingApplicants(false);
+      }
+    };
+    fetchApplicants();
+  }, [newRoomJobId, profile?.role]);
 
   useEffect(() => {
     let subscription: any = null;
@@ -154,6 +185,28 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
     }
   };
 
+  const handleCreateRoom = async () => {
+    if (!newRoomJobId || !newRoomMessage.trim() || !user) return;
+    setCreatingRoom(true);
+    try {
+      const targetJobId = newRoomJobId;
+      await messagesApi.send({ job_id: targetJobId, sender_id: user.id, content: newRoomMessage.trim() });
+      setShowNewRoomModal(false);
+      setNewRoomJobId('');
+      setNewRoomInspectorId('');
+      setNewRoomMessage('');
+      setJobApplicants([]);
+      // Reload jobs and select the new one
+      await loadJobs();
+      setSelectedJobId(targetJobId);
+    } catch (e) {
+      console.error('Failed to create talk room:', e);
+      alert('トークルームの作成に失敗しました');
+    } finally {
+      setCreatingRoom(false);
+    }
+  };
+
   const loadMessages = async () => {
     if (!selectedJobId) return;
 
@@ -244,10 +297,11 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">メッセージ</h1>
-      </div>
+    <>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-slate-900">メッセージ</h1>
+        </div>
 
       {error && !loading && jobs.length === 0 && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
@@ -261,11 +315,11 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden" style={{ height: '600px' }}>
+      <div className="bg-white rounded-lg shadow overflow-hidden h-[calc(100vh-12rem)] min-h-[500px]">
         <div className="grid grid-cols-3 h-full">
           <div className="col-span-1 border-r border-slate-200 overflow-y-auto">
             <div className="p-4 border-b border-slate-200">
-              <div className="relative">
+              <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
@@ -273,6 +327,13 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
                   className="w-full pl-10 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 />
               </div>
+              <button
+                onClick={() => setShowNewRoomModal(true)}
+                className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm"
+              >
+                <Plus className="w-4 h-4" />
+                <span>新規トークルーム</span>
+              </button>
             </div>
             {jobs.length === 0 ? (
               <div className="p-8 text-center text-slate-500">
@@ -281,35 +342,36 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
             ) : (
               <div className="divide-y divide-slate-200">
                 {jobs.map((job) => {
-                  if (!job || !job.id) {
-                    console.error('Invalid job in list:', job);
-                    return null;
-                  }
+                  if (!job || !job.id) return null;
+                  const partnerName = profile?.role === 'organization'
+                    ? '検定官'
+                    : (job.organizations?.organization_name || '検定機関');
                   return (
                     <div
                       key={job.id}
-                      onClick={() => {
-                        console.log('Job clicked:', job.id, job.title);
-                        setSelectedJobId(job.id);
-                      }}
+                      onClick={() => setSelectedJobId(job.id)}
                       className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors ${
-                        selectedJobId === job.id ? 'bg-slate-50' : ''
+                        selectedJobId === job.id ? 'bg-slate-100 border-l-2 border-slate-700' : ''
                       }`}
                     >
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-semibold text-slate-900 truncate">
-                            {job.title || '無題'}
-                          </h3>
-                          {/* 未読バッジ（モック表示） */}
-                          {selectedJobId !== job.id && job.id.charCodeAt(0) % 2 === 0 && (
-                            <span className="flex-shrink-0 ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">
-                              1
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-600 truncate mt-1">
-                          {job.organizations?.organization_name || '組織名なし'}
-                        </p>
+                      {/* 検定官名（太字） */}
+                      <p className="font-bold text-slate-900 text-sm truncate">{partnerName}</p>
+                      {/* 検定名 */}
+                      <p className="text-sm text-slate-700 truncate mt-0.5">{job.title || '無題'}</p>
+                      <div className="flex items-center justify-between mt-1 gap-2">
+                        {/* 日付 */}
+                        <span className="text-xs text-slate-500 shrink-0">
+                          {job.inspection_date || '—'}
+                        </span>
+                        {/* エリア */}
+                        <span className="text-xs text-slate-500 truncate">
+                          {[job.prefecture, job.city].filter(Boolean).join(' ') || '—'}
+                        </span>
+                        {/* 未読バッジ */}
+                        {selectedJobId !== job.id && job.id.charCodeAt(0) % 2 === 0 && (
+                          <span className="flex-shrink-0 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">1</span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -473,5 +535,122 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
         </div>
       </div>
     </div>
+
+    {/* パターン2: 新規トークルーム作成モーダル */}
+    {showNewRoomModal && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900">新規トークルーム作成</h2>
+            <button
+              onClick={() => setShowNewRoomModal(false)}
+              className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
+            {/* 検定機関向け: 楽を選ぶ */}
+            {profile?.role === 'organization' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">検定案件を選択</label>
+                  <select
+                    value={newRoomJobId}
+                    onChange={(e) => setNewRoomJobId(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500"
+                  >
+                    <option value="">— 案件を選んでください —</option>
+                    {jobs.map((j: any) => (
+                      <option key={j.id} value={j.id}>{j.title || '無題'}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    問合せ先の検定官
+                  </label>
+                  {!newRoomJobId ? (
+                    <p className="text-sm text-slate-400 px-3 py-2 border border-slate-200 rounded-lg bg-slate-50">
+                      まず案件を選択してください
+                    </p>
+                  ) : loadingApplicants ? (
+                    <div className="px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-sm text-slate-500">
+                      読み込み中...
+                    </div>
+                  ) : jobApplicants.length === 0 ? (
+                    <p className="text-sm text-amber-600 px-3 py-2 border border-amber-200 rounded-lg bg-amber-50">
+                      この案件への応募者がいません
+                    </p>
+                  ) : (
+                    <select
+                      value={newRoomInspectorId}
+                      onChange={(e) => setNewRoomInspectorId(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500"
+                    >
+                      <option value="">— 検定官を選んでください —</option>
+                      {jobApplicants.map((app: any) => (
+                        <option key={app.id} value={app.inspector_id}>
+                          {app.inspectors?.profiles?.full_name || '名前不明'}
+                          {app.status === 'confirmed' ? ' ✓ 確定済み' : app.status === 'pending' ? ' （審査中）' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* 検定官向け: 楽を選ぶ */}
+            {profile?.role === 'inspector' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">問合せ先の検定案件</label>
+                <select
+                  value={newRoomJobId}
+                  onChange={(e) => setNewRoomJobId(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500"
+                >
+                  <option value="">— 案件を選んでください —</option>
+                  {jobs.map((j: any) => (
+                    <option key={j.id} value={j.id}>{j.title || '無題'}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">応募済みの案件を対象に問合せが送信できます</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">最初のメッセージ</label>
+              <textarea
+                value={newRoomMessage}
+                onChange={(e) => setNewRoomMessage(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500"
+                placeholder="問合せ内容を入力してください"
+              />
+            </div>
+          </div>
+
+          <div className="px-6 py-4 border-t border-slate-200 flex justify-end space-x-3">
+            <button
+              onClick={() => setShowNewRoomModal(false)}
+              className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={handleCreateRoom}
+              disabled={!newRoomJobId || !newRoomMessage.trim() || creatingRoom}
+              className="px-5 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400 flex items-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>{creatingRoom ? '作成中...' : 'トークルームを作成'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

@@ -166,7 +166,10 @@ export function OrgDashboard({
                     className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                   >
                     <div>
-                      <h4 className="font-semibold text-slate-900">{job.title}</h4>
+                      <h4 className="font-semibold text-slate-900">
+                        {job.job_number && <span className="text-sm text-slate-500 mr-2">{job.job_number}</span>}
+                        {job.title}
+                      </h4>
                       <p className="text-sm text-slate-600">
                         {job.start_time} - {job.end_time} | {job.location}
                       </p>
@@ -319,7 +322,10 @@ export function OrgDashboard({
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-3">
-                        <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {job.job_number && <span className="text-sm text-slate-500 mr-2">{job.job_number}</span>}
+                          {job.title}
+                        </h3>
                         {getStatusBadge()}
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600">
@@ -340,10 +346,14 @@ export function OrgDashboard({
                           <span>{job.inspector_count || 1}名</span>
                         </div>
                         <div className="flex items-center space-x-2">
-                          {job.accommodation_required ? (
+                          {job.accommodation !== 'none' ? (
                             <>
                               <Hotel className="w-4 h-4 text-blue-600" />
-                              <span className="text-blue-600">宿泊あり</span>
+                              <span className="text-blue-600">
+                                {job.accommodation === 'before' ? '宿泊（前泊）' :
+                                 job.accommodation === 'after' ? '宿泊（後泊）' :
+                                 job.accommodation === 'both' ? '宿泊（前後泊）' : '宿泊あり'}
+                              </span>
                             </>
                           ) : (
                             <>
@@ -354,7 +364,7 @@ export function OrgDashboard({
                         </div>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 w-56 justify-end shrink-0 ml-4">
                       {applicationCount > 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleViewApplications(job.id); }}

@@ -135,6 +135,7 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
                         <h3 className="text-lg font-semibold text-slate-900">
+                          {job?.job_number && <span className="text-sm font-normal text-slate-500 mr-2">{job.job_number}</span>}
                           {job?.title}
                         </h3>
                         <span
@@ -165,7 +166,7 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
                           </div>
                           <div className="flex items-center space-x-2">
                             <MapPin className="w-4 h-4" />
-                            <span>{job.prefecture}</span>
+                            <span>{job.prefecture}{job.city ? ` ${job.city}` : ''}</span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <DollarSign className="w-4 h-4" />

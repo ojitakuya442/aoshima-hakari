@@ -254,7 +254,10 @@ export function InspectorDashboard({
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {job.job_number && <span className="text-sm text-slate-500 mr-2">{job.job_number}</span>}
+                          {job.title}
+                        </h3>
                         {getStatusBadge()}
                       </div>
                       <p className="text-sm text-slate-600 mb-3">
@@ -271,7 +274,7 @@ export function InspectorDashboard({
                         </div>
                         <div className="flex items-center space-x-2">
                           <MapPin className="w-4 h-4" />
-                          <span>{job.prefecture}</span>
+                          <span>{job.prefecture} {job.city || ''}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <DollarSign className="w-4 h-4" />
