@@ -11,6 +11,7 @@ import { NotificationsScreen } from './components/notifications/NotificationsScr
 import { CreateJobScreen } from './components/org/CreateJobScreen';
 import { JobDetailScreen } from './components/job/JobDetailScreen';
 import { ApplicationsScreen } from './components/org/ApplicationsScreen';
+import { UserManagementScreen } from './components/org/UserManagementScreen';
 
 type Screen =
   | 'org-dashboard'
@@ -21,7 +22,7 @@ type Screen =
   | 'messages'
   | 'profile'
   | 'history'
-  | 'notifications';
+  | 'user-management';
 
 function App() {
   const { user, profile, loading } = useAuth();
@@ -84,8 +85,9 @@ function App() {
         return <ProfileScreen onNavigate={handleNavigate} />;
       case 'history':
         return <HistoryScreen onNavigate={handleNavigate} />;
-      case 'notifications':
-        return <NotificationsScreen onNavigate={handleNavigate} />;
+      case 'user-management':
+        // @ts-ignore
+        return <UserManagementScreen onNavigate={handleNavigate} />;
       default:
         return profile.role === 'organization' ? (
           <OrgDashboard onNavigate={handleNavigate} onSelectJob={(jobId) => handleNavigate('job-detail', jobId)} />

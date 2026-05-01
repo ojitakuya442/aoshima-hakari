@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Search } from 'lucide-react';
+import { Send, Search, Paperclip, CheckCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { messagesApi, jobsApi, applicationsApi, inspectorsApi, organizationsApi, auditLogsApi } from '../../services/api';
 
@@ -296,12 +296,20 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
                         selectedJobId === job.id ? 'bg-slate-50' : ''
                       }`}
                     >
-                      <h3 className="font-semibold text-slate-900 truncate">
-                        {job.title || '無題'}
-                      </h3>
-                      <p className="text-sm text-slate-600 truncate mt-1">
-                        {job.organizations?.organization_name || '組織名なし'}
-                      </p>
+                        <div className="flex justify-between items-start">
+                          <h3 className="font-semibold text-slate-900 truncate">
+                            {job.title || '無題'}
+                          </h3>
+                          {/* 未読バッジ（モック表示） */}
+                          {selectedJobId !== job.id && job.id.charCodeAt(0) % 2 === 0 && (
+                            <span className="flex-shrink-0 ml-2 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-500 text-white">
+                              1
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-600 truncate mt-1">
+                          {job.organizations?.organization_name || '組織名なし'}
+                        </p>
                     </div>
                   );
                 })}
@@ -393,18 +401,26 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
                               >
                                 <p className="whitespace-pre-wrap">{message.content || ''}</p>
                                 {message.created_at && (
-                                  <p
-                                    className={`text-xs mt-1 ${
-                                      isOwnMessage ? 'text-slate-300' : 'text-slate-500'
-                                    }`}
-                                  >
-                                    {new Date(message.created_at).toLocaleString('ja-JP', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </p>
+                                  <div className={`flex items-center mt-1 space-x-1 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                                    <p
+                                      className={`text-xs ${
+                                        isOwnMessage ? 'text-slate-300' : 'text-slate-500'
+                                      }`}
+                                    >
+                                      {new Date(message.created_at).toLocaleString('ja-JP', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                    {isOwnMessage && (
+                                      <span className="flex items-center text-xs text-blue-300 ml-2" title="既読">
+                                        <CheckCheck className="w-3 h-3 mr-0.5" />
+                                        既読
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
@@ -423,15 +439,19 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
                   <div ref={messagesEndRef} />
                 </div>
 
-                <div className="p-4 border-t border-slate-200">
+                <div className="p-4 border-t border-slate-200 bg-slate-50">
                   <div className="flex items-center space-x-2">
+                    <label className="cursor-pointer p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors">
+                      <Paperclip className="w-5 h-5" />
+                      <input type="file" className="hidden" />
+                    </label>
                     <input
                       type="text"
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                       placeholder="メッセージを入力..."
-                      className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
                     />
                     <button
                       onClick={handleSendMessage}

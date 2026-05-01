@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>議事録 - 検定マッチングシステム キックオフミーティング</title>
+<style>
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", YuGothic, Meiryo, sans-serif;
+    font-size: 16px;
+    line-height: 1.75;
+    color: #1f2937;
+    background: #ffffff;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container {
+    max-width: 820px;
+    margin: 0 auto;
+    padding: 48px 32px 80px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 8px;
+    letter-spacing: 0.02em;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #111827;
+    margin: 40px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e7eb;
+    letter-spacing: 0.02em;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .meta {
+    color: #6b7280;
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  dl.info {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 8px 16px;
+    margin: 0;
+    font-size: 15px;
+  }
+  dl.info dt {
+    color: #6b7280;
+    font-weight: 400;
+  }
+  dl.info dd {
+    margin: 0;
+    color: #1f2937;
+  }
+  ol.agenda {
+    padding-left: 24px;
+    margin: 0;
+  }
+  ol.agenda li {
+    margin-bottom: 6px;
+  }
+  details {
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  details summary {
+    cursor: pointer;
+    padding: 14px 16px;
+    background: #f9fafb;
+    font-weight: 600;
+    color: #111827;
+    font-size: 15px;
+    list-style: none;
+    user-select: none;
+    position: relative;
+    padding-right: 40px;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details summary::after {
+    content: "";
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 1.5px solid #6b7280;
+    border-bottom: 1.5px solid #6b7280;
+    transform: translateY(-75%) rotate(45deg);
+    transition: transform 0.2s ease;
+  }
+  details[open] summary::after {
+    transform: translateY(-25%) rotate(-135deg);
+  }
+  details summary:hover { background: #f3f4f6; }
+  details .body {
+    padding: 16px 20px;
+    border-top: 1px solid #e5e7eb;
+  }
+  details .body p {
+    margin: 0 0 10px;
+  }
+  details .body p:last-child { margin-bottom: 0; }
+  details .body h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+    margin: 14px 0 6px;
+    padding: 0;
+    border: none;
+    letter-spacing: 0.02em;
+  }
+  details .body h4:first-child { margin-top: 0; }
+  details .body ul {
+    margin: 0 0 10px;
+    padding-left: 20px;
+  }
+  details .body ul:last-child { margin-bottom: 0; }
+  details .body li {
+    margin-bottom: 4px;
+    line-height: 1.7;
+  }
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .controls button {
+    font: inherit;
+    font-size: 13px;
+    color: #374151;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .controls button:hover { background: #f3f4f6; }
+  ul.tasks {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  ul.tasks li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+  ul.tasks li:last-child { border-bottom: none; }
+  ul.tasks input[type="checkbox"] {
+    margin-top: 6px;
+    width: 16px;
+    height: 16px;
+    accent-color: #374151;
+    flex-shrink: 0;
+  }
+  ul.tasks .content {
+    flex: 1;
+  }
+  ul.tasks .content .text { color: #1f2937; }
+  ul.tasks .content .detail {
+    display: block;
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  ul.tasks input[type="checkbox"]:checked ~ .content .text {
+    text-decoration: line-through;
+    color: #9ca3af;
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+    color: #9ca3af;
+    font-size: 13px;
+    text-align: right;
+  }
+  @media (max-width: 640px) {
+    .container { padding: 32px 20px 64px; }
+    h1 { font-size: 24px; }
+    dl.info { grid-template-columns: 96px 1fr; }
+  }
+  @media print {
+    body { color: #000; }
+    .container { max-width: 100%; padding: 24px; }
+    .controls { display: none; }
+    details { border: none; break-inside: avoid; }
+    details summary { background: transparent; padding: 0 0 8px; font-size: 16px; }
+    details summary::after { display: none; }
+    details .body { border: none; padding: 0 0 16px; }
+    details > .body { display: block !important; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>議事録</h1>
+    <p class="meta">検定マッチングシステム開発 キックオフミーティング</p>
+  </header>
+
+  <section>
+    <h2>会議の基本情報</h2>
+    <dl class="info">
+      <dt>日時</dt><dd>情報なし</dd>
+      <dt>場所</dt><dd>オンラインミーティング</dd>
+      <dt>参加者</dt><dd>青島（クライアント）、大井／王子（オージ・PM／テックリード兼任）、栗原（モック担当）、開発側担当者</dd>
+      <dt>記録者</dt><dd>情報なし</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>アジェンダ・議題</h2>
+    <ol class="agenda">
+      <li>プロジェクト体制・アサインメンバーの紹介</li>
+      <li>モックを用いた機能要件の確認</li>
+      <li>カレンダー機能の仕様確認</li>
+      <li>検定一覧・絞り込み検索の仕様</li>
+      <li>新規検定作成・募集機能</li>
+      <li>ファイルアップロードとストレージ制限への対応</li>
+      <li>メッセージ機能・通知機能</li>
+      <li>検定官側マイページの仕様</li>
+      <li>ユーザー管理ページの追加</li>
+      <li>今後の進め方・次回ミーティング日程</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>議論の要約</h2>
+    <div class="controls">
+      <button type="button" data-action="expand">すべて展開</button>
+      <button type="button" data-action="collapse">すべて折りたたむ</button>
+    </div>
+
+    <details open>
+      <summary>プロジェクト体制</summary>
+      <div class="body">
+        <ul>
+          <li>PM・テックリードを「オージ（王子）」が兼任</li>
+          <li>オージはBubble認定試験合格者</li>
+          <li>SLBC案件のPM経験あり</li>
+          <li>今後、別のPMが追加で入る可能性あり（追って連絡）</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>カレンダー機能</summary>
+      <div class="body">
+        <h4>基本イメージ</h4>
+        <ul>
+          <li>各日付枠に「何月何日にこの検定がある」が表示される</li>
+          <li>イメージはGoogleカレンダー</li>
+          <li>土日祝日は色分けで分かりやすく表示</li>
+          <li>検定機関側で長期休暇を設定可能</li>
+        </ul>
+        <h4>表示・フォントに関する論点</h4>
+        <ul>
+          <li>利用者に60代がいるため、フォントが小さいと見にくい懸念</li>
+          <li>PCは十分な幅があるが、スマホで同じデザインだとフォントを大きくすると字数が表示しきれない</li>
+          <li>PC版とスマホ版でデザインを切り替える可能性あり</li>
+          <li>クリック時に詳細を大きく表示できれば、同一デザインの使い回しも可能</li>
+          <li>実際の運用感は今後、先方ヒアリングを踏まえて判断</li>
+        </ul>
+        <h4>表示量への対応</h4>
+        <ul>
+          <li>年間目標 500〜1,000件程度（月100件超の可能性）</li>
+          <li>1日に件数が多くなった場合、マス内に収まりきらない懸念</li>
+          <li>対応案：日付クリックで下または横に一覧表示</li>
+          <li>マス内には「+◯件」のような埋まり具合を示す表示は欲しい</li>
+          <li>パッと見で「ここは忙しい」と把握でき、詳細は別表示で確認できる形にしたい</li>
+          <li>2パターン（マス内表示／横並び表示）を提示しながら都度調整する方針</li>
+        </ul>
+        <h4>色分け</h4>
+        <ul>
+          <li>検定機関本部が使用する際、エリアごとに色分けしたい</li>
+          <li>1検定＝1色（一対一対応）で実装</li>
+          <li>ユーザーごとに色を変える複数対応は不要</li>
+        </ul>
+        <h4>持ち帰り事項</h4>
+        <ul>
+          <li>日付クリック時の表示切替の実装方針は次回回答</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>検定一覧・絞り込み検索</summary>
+      <div class="body">
+        <h4>検定官の絞り込み（検定機関側で使用）</h4>
+        <ul>
+          <li>検定機関側から特定の検定官に募集を出すため、エリア・県・市での絞り込みが必要</li>
+          <li>絞り込み単位は「市まで」</li>
+          <li>検定官の住所を最初に登録し、それを基に絞り込む</li>
+          <li>検定官側で検定機関を絞り込む機能は不要</li>
+        </ul>
+        <h4>検定一覧の絞り込み・並び替え</h4>
+        <ul>
+          <li>日付順での並び替え</li>
+          <li>エリアごとの絞り込み</li>
+          <li>確定／未確定のステータス絞り込み</li>
+          <li>Excelテーブルのように各項目でフィルターをかけられる形を希望</li>
+          <li>その他の並び替えは現時点では不要</li>
+        </ul>
+        <h4>ステータス管理</h4>
+        <ul>
+          <li>「募集前（募集予約）」「募集中」「確定済み」の3段階で管理</li>
+          <li>「終了」ステータスは不要</li>
+        </ul>
+        <h4>本部とエリア担当者の権限</h4>
+        <ul>
+          <li>本部は全国を閲覧可能</li>
+          <li>事業所はエリアごとに5〜6エリアあり、担当は自エリアのみマッチング</li>
+          <li>エリア担当者はログイン時点で自エリアのみ表示する形が望ましい</li>
+          <li>デフォルトで絞り込み状態を適用し、外せば他エリアも見られる設計も可能</li>
+          <li>他事業所案件を参照するニーズがあるかは青島側で確認</li>
+          <li>ユーザー管理は本部のみが実施</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>新規検定作成・募集機能</summary>
+      <div class="body">
+        <ul>
+          <li>募集の予約機能を追加（作成は今、開始日は別途設定）</li>
+          <li>募集方法は「全員に一斉お知らせ → 検定官が応募の意思表示 → 検定機関が選抜」の流れ</li>
+          <li>マッチング自動完了ではなく、検定機関が選ぶ求人募集型</li>
+          <li>応募者の有無は依頼検定一覧画面で確認できればよい</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>ファイルアップロード・ストレージ</summary>
+      <div class="body">
+        <h4>アップロード仕様</h4>
+        <ul>
+          <li>検定機関は資料を一括アップロード可能</li>
+          <li>検定官側のダウンロードは時間指定（応募後など）で差をつける</li>
+          <li>検定官からの完成書類アップロードも可能（期間指定不要）</li>
+          <li>許可形式：PDF、Excel、Word、MP4 など6種類程度</li>
+          <li>セキュリティ・容量の観点で形式制限は必要</li>
+        </ul>
+        <h4>動画ファイル</h4>
+        <ul>
+          <li>スマホ撮影動画（最長5分程度）の利用可能性あり</li>
+          <li>1回で撮影・アップロードできる方が両者にとって使いやすい</li>
+          <li>5分動画で約0.5GB程度</li>
+        </ul>
+        <h4>ストレージ上限（Bubble）</h4>
+        <ul>
+          <li>スタータープラン（月29ドル／約5,000〜6,000円）で50GBまで</li>
+          <li>超過時は追加費用が発生（具体額は次回共有）</li>
+          <li>選択肢：(1) 制限内に収める設計、(2) 一定期間でファイル自動削除、(3) 超過容認</li>
+        </ul>
+        <h4>合意した対応方針</h4>
+        <ul>
+          <li>本部側で任意のファイルを手動削除できる機能を追加</li>
+          <li>検定実施後、一定期間経過したファイルは自動削除</li>
+          <li>本部画面でファイル容量を表示できるようにする方向（要確認）</li>
+          <li>動画は短く撮影してもらう運用も併用</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>メッセージ機能</summary>
+      <div class="body">
+        <h4>基本仕様</h4>
+        <ul>
+          <li>案件（検定）ごとにメッセージのやりとり</li>
+          <li>トークルーム作成タイミングは、検定機関が募集をかけた段階（マッチング完了前から利用可）</li>
+          <li>ファイル・画像・動画の送受信も可能にする方針</li>
+          <li>既読／未読表示を実装</li>
+        </ul>
+        <h4>表示単位</h4>
+        <ul>
+          <li>検定官側：個別のやり取り（一対一）として、募集詳細画面上で完結する想定</li>
+          <li>検定機関側：複数の検定官との一対一が並ぶ形。トークルーム形式が見やすい</li>
+          <li>検定機関のエリア担当者は同エリアの検定官メッセージを全て閲覧可能</li>
+          <li>トークルームの表示項目：検定官名（太字）、検定名、日付、エリア</li>
+        </ul>
+        <h4>通知</h4>
+        <ul>
+          <li>メッセージ受信時はメニュー上に赤丸表示</li>
+          <li>プッシュ通知はPWA化＋OneSignal（無料・無制限）の活用を別途提案</li>
+          <li>メール配信はSendGridの無料プラン廃止に伴いBrevoへ変更予定（無料枠詳細は後日共有）</li>
+          <li>通知一覧画面（お知らせ画面）は不要</li>
+        </ul>
+        <h4>持ち帰り事項</h4>
+        <ul>
+          <li>トークルームに関する直近のメール内容を再確認</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>検定官側マイページ</summary>
+      <div class="body">
+        <ul>
+          <li>事前に検定機関で人選・教育済みの有資格者のみが登録される</li>
+          <li>全員同一資格・全員が全案件対応可能なため、保有資格欄は不要</li>
+          <li>資格による絞り込みは不要</li>
+          <li>顔写真（アイコン）アップロード機能を追加</li>
+          <li>検定官側の通知一覧画面は不要（メッセージ赤丸のみで十分）</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>ユーザー管理ページ</summary>
+      <div class="body">
+        <ul>
+          <li>本部画面にユーザー管理ページを新規追加</li>
+          <li>登録は招待制（一般ユーザーが自主的にサインアップする運用はなし）</li>
+          <li>検定官・地域の検定機関担当者の追加／削除／編集が可能</li>
+          <li>退職者削除や不適切ユーザーの編集・削除に対応</li>
+          <li>ユーザー管理は本部のみ実施</li>
+        </ul>
+      </div>
+    </details>
+
+    <details open>
+      <summary>進め方・コミュニケーション</summary>
+      <div class="body">
+        <ul>
+          <li>機能は最初に「もりもり」で出してから削る方針で進める</li>
+          <li>追加機能を後出しされるより、最初に希望を全部出してもらう方が対応しやすい</li>
+          <li>今後のコミュニケーションはメールで継続</li>
+          <li>大井（営業窓口）は契約周り・追加発注の窓口として継続対応</li>
+          <li>開発・要件定義はオージ（王子）にバトンタッチ</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <section>
+    <h2>決定事項</h2>
+    <ul class="tasks">
+      <li>
+        <input type="checkbox" id="d1">
+        <label for="d1" class="content"><span class="text">PM・テックリードはオージ（王子）が兼任</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d2">
+        <label for="d2" class="content"><span class="text">カレンダーはGoogleカレンダーをベースに、土日祝日の色分けと長期休暇設定機能を実装</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d3">
+        <label for="d3" class="content"><span class="text">検定機関本部によるエリア単位の色分けを実装（1検定1色の一対一対応）</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d4">
+        <label for="d4" class="content"><span class="text">地域絞り込みの単位は「市まで」</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d5">
+        <label for="d5" class="content"><span class="text">検定一覧の絞り込み項目は「日付」「エリア」「確定／未確定」</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d6">
+        <label for="d6" class="content"><span class="text">検定ステータスは「募集前」「募集中」「確定済み」の3段階</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d7">
+        <label for="d7" class="content"><span class="text">本部は全国閲覧可能、エリア担当者は自エリアのみ表示する権限分離</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d8">
+        <label for="d8" class="content"><span class="text">ユーザー管理は本部のみが実施（招待制）</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d9">
+        <label for="d9" class="content"><span class="text">募集の予約機能を実装（作成と募集開始日を分離）</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d10">
+        <label for="d10" class="content"><span class="text">募集方式は「全検定官への一斉お知らせ → 応募 → 検定機関による選抜」の求人募集型</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d11">
+        <label for="d11" class="content"><span class="text">アップロード許可形式はPDF・Excel・Word・MP4等に制限</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d12">
+        <label for="d12" class="content"><span class="text">ストレージ対策として本部の手動削除機能と一定期間後の自動削除を実装</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d13">
+        <label for="d13" class="content"><span class="text">トークルームは募集開始時点で利用可能、ファイル添付・既読表示も実装</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d14">
+        <label for="d14" class="content"><span class="text">メッセージ通知はメニュー上の赤丸表示、PWA＋OneSignalによるプッシュ通知は別途提案</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d15">
+        <label for="d15" class="content"><span class="text">メール配信サービスはBrevoを採用予定（SendGridの無料プラン廃止に伴う変更）</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d16">
+        <label for="d16" class="content"><span class="text">検定官マイページの保有資格欄・通知一覧画面は不要、顔写真機能を追加</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d17">
+        <label for="d17" class="content"><span class="text">本部画面にユーザー管理ページを新規追加</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d18">
+        <label for="d18" class="content"><span class="text">今後のコミュニケーションはメールで継続</span></label>
+      </li>
+      <li>
+        <input type="checkbox" id="d19">
+        <label for="d19" class="content"><span class="text">次回オンラインミーティングは5月12日（火）16:00から</span></label>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>アクションアイテム</h2>
+    <ul class="tasks">
+      <li>
+        <input type="checkbox" id="a1">
+        <label for="a1" class="content">
+          <span class="text">スマホ表示時のカレンダーフォントの見え方について先方ヒアリング</span>
+          <span class="detail">担当：青島　期限：未定</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a2">
+        <label for="a2" class="content">
+          <span class="text">他事業所の案件参照ニーズの有無を確認</span>
+          <span class="detail">担当：青島　期限：未定</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a3">
+        <label for="a3" class="content">
+          <span class="text">検定官側ダウンロードの時間指定運用ルールを先方確認</span>
+          <span class="detail">担当：青島　期限：未定</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a4">
+        <label for="a4" class="content">
+          <span class="text">いただいた要望を反映したモック修正版の作成・共有</span>
+          <span class="detail">担当：開発側（栗原・王子）　期限：5月12日ミーティングまで</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a5">
+        <label for="a5" class="content">
+          <span class="text">日付クリック時の表示切替（カレンダー詳細表示）の実装方針回答</span>
+          <span class="detail">担当：王子　期限：次回ミーティング</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a6">
+        <label for="a6" class="content">
+          <span class="text">トークルームに関する直近メール内容の再確認</span>
+          <span class="detail">担当：王子　期限：次回ミーティングまで</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a7">
+        <label for="a7" class="content">
+          <span class="text">Bubbleストレージ超過時の追加費用の具体的な数字を共有</span>
+          <span class="detail">担当：王子　期限：次回ミーティング</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a8">
+        <label for="a8" class="content">
+          <span class="text">Brevoの無料プラン詳細（送信通数等）を共有</span>
+          <span class="detail">担当：王子　期限：次回ミーティング</span>
+        </label>
+      </li>
+      <li>
+        <input type="checkbox" id="a9">
+        <label for="a9" class="content">
+          <span class="text">本部画面でのファイル容量表示機能の実装可否確認</span>
+          <span class="detail">担当：王子　期限：未定</span>
+        </label>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>次回会議</h2>
+    <dl class="info">
+      <dt>日時</dt><dd>5月12日（火）16:00〜</dd>
+      <dt>場所</dt><dd>オンラインミーティング</dd>
+      <dt>議題（予定）</dt><dd>修正版モックのレビュー、要件定義の詳細化、未確定事項の合意</dd>
+    </dl>
+  </section>
+
+  <footer>作成日：2026年4月30日</footer>
+
+</div>
+<script>
+  document.querySelectorAll('.controls button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const open = btn.dataset.action === 'expand';
+      btn.closest('section').querySelectorAll('details').forEach(d => { d.open = open; });
+    });
+  });
+</script>
+</body>
+</html>

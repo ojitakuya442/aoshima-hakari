@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, DollarSign, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel } from 'lucide-react';
+import { Calendar, Clock, MapPin, DollarSign, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel, Trash2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, applicationsApi, inspectorsApi, auditLogsApi, filesApi } from '../../services/api';
 import { supabase } from '../../lib/supabase';
@@ -104,14 +104,14 @@ export function JobDetailScreen({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.mp4', '.exe'];
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.mp4'];
       const invalidFiles = newFiles.filter(file => {
         const ext = '.' + file.name.split('.').pop()?.toLowerCase();
         return !allowedExtensions.includes(ext);
       });
 
       if (invalidFiles.length > 0) {
-        setError(`以下の形式のみアップロード可能です: PDF, Word, JPG, PNG, MP4, EXE`);
+        setError(`以下の形式のみアップロード可能です: PDF, Word, Excel, JPG, PNG, MP4`);
         return;
       }
 
@@ -250,6 +250,17 @@ export function JobDetailScreen({
       URL.revokeObjectURL(url);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ダウンロードに失敗しました');
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!confirm('このファイルを削除しますか？')) return;
+    try {
+      const { error } = await supabase.from('files').delete().eq('id', fileId);
+      if (error) throw error;
+      await loadFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ファイルの削除に失敗しました');
     }
   };
 
@@ -487,11 +498,11 @@ export function JobDetailScreen({
                       onChange={handleFileSelect}
                       disabled={uploading}
                       className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.exe"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.mp4"
                     />
                   </label>
                   <p className="mt-2 text-sm text-slate-500">
-                    PDF, Word, JPG, PNG, MP4, EXE形式
+                    PDF, Word, Excel, JPG, PNG, MP4形式
                   </p>
                 </div>
 
@@ -575,13 +586,24 @@ export function JobDetailScreen({
                       </div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDownload(file)}
-                    className="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-white transition-colors flex items-center space-x-2"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>DL</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleDownload(file)}
+                      className="px-3 py-2 text-sm border border-slate-300 rounded-lg hover:bg-white transition-colors flex items-center space-x-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>DL</span>
+                    </button>
+                    {profile?.role === 'organization' && (
+                      <button
+                        onClick={() => handleDeleteFile(file.id)}
+                        className="px-3 py-2 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center space-x-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>削除</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))
             )}

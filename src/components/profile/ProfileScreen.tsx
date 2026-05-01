@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { organizationsApi, inspectorsApi } from '../../services/api';
 import { supabase } from '../../lib/supabase';
 
-type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
+type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'user-management';
 
 export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
   const { user, profile, updateProfile } = useAuth();
@@ -17,7 +17,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
     full_name: '',
     phone: '',
     address: '',
-    qualifications: '',
     experience: '',
     skills: '',
     organization_name: '',
@@ -37,7 +36,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
       full_name: profile.full_name || '',
       phone: profile.phone || '',
       address: profile.address || '',
-      qualifications: '',
       experience: '',
       skills: '',
       organization_name: '',
@@ -50,7 +48,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
         if (inspector) {
           setFormData((prev) => ({
             ...prev,
-            qualifications: inspector.qualifications || '',
             experience: inspector.experience || '',
             skills: inspector.skills || '',
           }));
@@ -126,7 +123,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
         const inspector = await inspectorsApi.getByUserId(user.id);
         if (inspector) {
           await inspectorsApi.update(inspector.id, {
-            qualifications: formData.qualifications,
             experience: formData.experience,
             skills: formData.skills,
           });
@@ -247,17 +243,6 @@ export function ProfileScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
 
         {profile?.role === 'inspector' && (
           <div className="border-t border-slate-200 pt-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">保有資格</label>
-              <textarea
-                value={formData.qualifications}
-                onChange={(e) => setFormData({ ...formData, qualifications: e.target.value })}
-                rows={3}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                placeholder="建築士一級、検定士資格..."
-              ></textarea>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">経験</label>
               <textarea

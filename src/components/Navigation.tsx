@@ -1,4 +1,4 @@
-import { Building2, MessageSquare, Bell, User, LogOut, History } from 'lucide-react';
+import { Building2, MessageSquare, User, LogOut, History, Users } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { notificationsApi } from '../services/api';
@@ -12,7 +12,7 @@ type Screen =
   | 'messages'
   | 'profile'
   | 'history'
-  | 'notifications';
+  | 'user-management';
 
 export function Navigation({
   currentScreen,
@@ -31,6 +31,7 @@ export function Navigation({
   }, [user]);
 
   const loadUnreadCount = async () => {
+    // 既存の未読バッジロジックをメッセージや他用途に流用する場合は残しますが、通知自体は削除します
     if (!user) return;
     try {
       const count = await notificationsApi.getUnreadCount(user.id);
@@ -86,22 +87,21 @@ export function Navigation({
               <History className="w-5 h-5" />
               <span>履歴</span>
             </button>
+            {profile?.role === 'organization' && (
+              <button
+                onClick={() => onNavigate('user-management')}
+                className="text-slate-600 hover:text-slate-900 flex items-center space-x-1"
+                title="ユーザー管理"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={() => onNavigate('profile')}
               className="text-slate-600 hover:text-slate-900"
+              title="プロフィール"
             >
               <User className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => onNavigate('notifications')}
-              className="text-slate-600 hover:text-slate-900 relative"
-            >
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
             </button>
             <button
               onClick={handleSignOut}

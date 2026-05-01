@@ -22,6 +22,10 @@ export function OrgDashboard({
   const [selectedDateJobs, setSelectedDateJobs] = useState<any[] | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  const [filterDate, setFilterDate] = useState('');
+  const [filterArea, setFilterArea] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+
   useEffect(() => {
     loadData();
   }, [user]);
@@ -172,7 +176,7 @@ export function OrgDashboard({
                             : 'bg-slate-100 text-slate-700'
                         }`}
                       >
-                        {job.status === 'open' ? '募集中' : job.status === 'confirmed' ? '確定済み' : job.status}
+                        {job.status === 'open' ? '募集中' : job.status === 'confirmed' ? '確定済み' : job.status === 'pre-open' ? '募集前' : job.status}
                       </span>
                       <button
                         onClick={() => onSelectJob(job.id)}
@@ -191,7 +195,35 @@ export function OrgDashboard({
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b border-slate-200">
-          <h2 className="text-xl font-bold text-slate-900">検定依頼一覧</h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+            <h2 className="text-xl font-bold text-slate-900">検定依頼一覧</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                title="日付で絞り込み"
+              />
+              <input
+                type="text"
+                placeholder="エリア（都道府県・市）"
+                value={filterArea}
+                onChange={(e) => setFilterArea(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-40"
+              />
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value="all">すべてのステータス</option>
+                <option value="pre-open">募集前</option>
+                <option value="open">募集中</option>
+                <option value="confirmed">確定済み</option>
+              </select>
+            </div>
+          </div>
         </div>
         {jobs.length === 0 ? (
           <div className="p-12 text-center text-slate-500">
@@ -199,7 +231,12 @@ export function OrgDashboard({
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
-            {jobs.map((job) => {
+            {jobs.filter(job => {
+              if (filterDate && job.inspection_date !== filterDate) return false;
+              if (filterArea && !((job.prefecture && job.prefecture.includes(filterArea)) || (job.city && job.city.includes(filterArea)))) return false;
+              if (filterStatus !== 'all' && job.status !== filterStatus) return false;
+              return true;
+            }).map((job) => {
               const applicationCount = jobApplicationCounts[job.id] || 0;
               const getStatusBadge = () => {
                 if (job.status === 'confirmed') {
@@ -214,16 +251,10 @@ export function OrgDashboard({
                       募集中
                     </span>
                   );
-                } else if (job.status === 'completed') {
+                } else if (job.status === 'pre-open') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
-                      完了
-                    </span>
-                  );
-                } else if (job.status === 'cancelled') {
-                  return (
-                    <span className="px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-medium">
-                      キャンセル
+                      募集前
                     </span>
                   );
                 } else {

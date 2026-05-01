@@ -6,6 +6,21 @@ type Job = {
   title: string;
   inspection_date: string;
   status: string;
+  prefecture?: string;
+};
+
+const getColorForJob = (job: Job) => {
+  const colors = [
+    'bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 
+    'bg-amber-500', 'bg-purple-500', 'bg-cyan-500',
+    'bg-indigo-500', 'bg-teal-500', 'bg-orange-500'
+  ];
+  let hash = 0;
+  const str = job.id || job.title;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 };
 
 export function JobCalendar({
@@ -70,8 +85,8 @@ export function JobCalendar({
       </div>
 
       <div className="grid grid-cols-7 gap-2">
-        {['日', '月', '火', '水', '木', '金', '土'].map((day) => (
-          <div key={day} className="text-center text-sm font-semibold text-slate-600 py-2">
+        {['日', '月', '火', '水', '木', '金', '土'].map((day, idx) => (
+          <div key={day} className={`text-center text-sm font-semibold py-2 ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-slate-600'}`}>
             {day}
           </div>
         ))}
@@ -87,6 +102,10 @@ export function JobCalendar({
             day === new Date().getDate() &&
             currentDate.getMonth() === new Date().getMonth() &&
             currentDate.getFullYear() === new Date().getFullYear();
+            
+          const isSunday = index % 7 === 0;
+          const isSaturday = index % 7 === 6;
+          const dayColor = isSunday ? 'text-red-600' : isSaturday ? 'text-blue-600' : 'text-slate-900';
 
           return (
             <button
@@ -98,9 +117,17 @@ export function JobCalendar({
                   : 'border-slate-200 hover:bg-slate-50'
               } ${isToday ? 'ring-2 ring-blue-500' : ''}`}
             >
-              <div className="text-sm font-medium text-slate-900">{day}</div>
+              <div className={`text-sm font-medium ${dayColor}`}>{day}</div>
               {dayJobs.length > 0 && (
-                <div className="mt-1">
+                <div className="mt-1 flex flex-col items-center">
+                  <div className="flex flex-wrap gap-1 justify-center mb-1">
+                    {dayJobs.slice(0, 3).map(job => (
+                      <div key={job.id} className={`w-2 h-2 rounded-full ${getColorForJob(job)}`} title={job.title} />
+                    ))}
+                    {dayJobs.length > 3 && (
+                      <div className="text-[10px] leading-none text-slate-500 font-bold ml-0.5">+</div>
+                    )}
+                  </div>
                   <div className="text-xs font-semibold text-blue-600">
                     {dayJobs.length}件
                   </div>

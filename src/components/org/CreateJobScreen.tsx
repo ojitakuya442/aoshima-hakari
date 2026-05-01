@@ -25,19 +25,20 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     visibility: 'local' as 'local' | 'public' | 'progressive',
     inspector_count: '1',
     accommodation_required: false,
+    recruitment_start_date: '',
   });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      const allowedExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.mp4', '.exe'];
+      const allowedExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.jpg', '.jpeg', '.png', '.mp4'];
       const invalidFiles = newFiles.filter(file => {
         const ext = '.' + file.name.split('.').pop()?.toLowerCase();
         return !allowedExtensions.includes(ext);
       });
 
       if (invalidFiles.length > 0) {
-        setError(`以下の形式のみアップロード可能です: PDF, Word, JPG, PNG, MP4, EXE`);
+        setError(`以下の形式のみアップロード可能です: PDF, Word, Excel, JPG, PNG, MP4`);
         return;
       }
 
@@ -76,7 +77,8 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         visibility: formData.visibility,
         inspector_count: parseInt(formData.inspector_count),
         accommodation_required: formData.accommodation_required,
-        status: 'open',
+        recruitment_start_date: formData.recruitment_start_date,
+        status: formData.recruitment_start_date && new Date(formData.recruitment_start_date) > new Date() ? 'pre-open' : 'open',
       });
 
       if (!job) throw new Error('案件の作成に失敗しました');
@@ -138,6 +140,21 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
               placeholder="例: 建築物検定業務"
               required
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              募集開始日 <span className="text-sm font-normal text-slate-500">（予約する場合のみ指定）</span>
+            </label>
+            <input
+              type="date"
+              value={formData.recruitment_start_date}
+              onChange={(e) => setFormData({ ...formData, recruitment_start_date: e.target.value })}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            />
+            <p className="mt-1 text-sm text-slate-500">
+              指定した日付までは「募集前」となり、指定日になると自動でお知らせが一斉送信され募集が開始されます。
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -338,12 +355,12 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                       multiple
                       onChange={handleFileSelect}
                       className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4,.exe"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.mp4"
                     />
                   </label>
                 </div>
                 <p className="mt-2 text-sm text-slate-500">
-                  PDF, Word, JPG, PNG, MP4, EXE形式のファイル
+                  PDF, Word, Excel, JPG, PNG, MP4形式のファイル
                 </p>
               </div>
 
@@ -392,7 +409,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
               disabled={loading || uploadingFiles}
               className="px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400"
             >
-              {uploadingFiles ? 'ファイルアップロード中...' : loading ? '作成中...' : '募集を開始'}
+              {uploadingFiles ? 'ファイルアップロード中...' : loading ? '作成中...' : formData.recruitment_start_date ? '募集を予約して作成' : '案件を作成して募集を開始'}
             </button>
           </div>
         </div>
