@@ -5,7 +5,6 @@ type AuthContextType = {
   user: MockUser | null;
   profile: Profile | null;
   loading: boolean;
-  signUp: (email: string, password: string, role: 'organization' | 'inspector', fullName: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -37,31 +36,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(nextProfile);
   };
 
-  const signUp = async (email: string, _password: string, role: 'organization' | 'inspector', fullName: string) => {
-    const existing = mockData.profiles.find((item) => item.email === email);
-    const nextProfile =
-      existing ||
-      ({
-        id: `${role}-${Date.now()}`,
-        email,
-        full_name: fullName,
-        phone: null,
-        address: null,
-        role,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } satisfies Profile);
-
-    if (!existing) {
-      mockData.profiles.push(nextProfile);
-    }
-
-    mockData.currentUserId = nextProfile.id;
-    setUser(getCurrentUser());
-    setProfile(nextProfile);
-  };
-
   const signOut = async () => {
     setUser(null);
     setProfile(null);
@@ -84,7 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         profile,
         loading,
-        signUp,
         signIn,
         signOut,
         resetPassword,
