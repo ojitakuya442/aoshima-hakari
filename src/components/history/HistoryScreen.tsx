@@ -1,15 +1,33 @@
 import { useState, useEffect } from 'react';
-import { Calendar, MapPin, DollarSign } from 'lucide-react';
+import { Calendar, Clock, MapPin, JapaneseYen, Users, Hotel, Check, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { applicationsApi, inspectorsApi, jobsApi, organizationsApi } from '../../services/api';
+import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
-export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
+type HistoryItem = {
+  id: string;
+  job: any;
+  status: 'completed' | 'withdrawn';
+  appliedAt?: string;
+};
+
+export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen: Screen) => void; onSelectJob?: (jobId: string) => void }) {
   const { user, profile } = useAuth();
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'confirmed' | 'rejected' | 'withdrawn'>('all');
+  const [filter, setFilter] = useState<'all' | 'completed' | 'withdrawn'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [filterRegion, setFilterRegion] = useState('all');
+  const [filterPrefecture, setFilterPrefecture] = useState('all');
+  const [filterCity, setFilterCity] = useState('');
+
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
 
   useEffect(() => {
     loadHistory();
@@ -23,18 +41,30 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
         const inspector = await inspectorsApi.getByUserId(user.id);
         if (inspector) {
           const applications = await applicationsApi.getByInspector(inspector.id);
-          setHistory(applications || []);
+          const items: HistoryItem[] = [];
+          for (const app of applications || []) {
+            const job = (app as any).jobs || (app as any).job || (await jobsApi.getById((app as any).job_id));
+            if (!job) continue;
+            const past = job.inspection_date && job.inspection_date < todayStr;
+            if ((app as any).status === 'confirmed' && past) {
+              items.push({ id: (app as any).id, job, status: 'completed', appliedAt: (app as any).created_at });
+            } else if ((app as any).status === 'withdrawn') {
+              items.push({ id: (app as any).id, job, status: 'withdrawn', appliedAt: (app as any).created_at });
+            }
+          }
+          setHistory(items);
         }
       } else {
         const org = await organizationsApi.getByUserId(user.id);
         if (org) {
           const jobs = await jobsApi.getByOrganization(org.id);
-          const allApplications = [];
+          const items: HistoryItem[] = [];
           for (const job of jobs || []) {
-            const apps = await applicationsApi.getByJob(job.id);
-            allApplications.push(...(apps || []).map((a: any) => ({ ...a, job })));
+            const past = job.inspection_date && job.inspection_date < todayStr;
+            if (!past) continue;
+            items.push({ id: job.id, job, status: 'completed' });
           }
-          setHistory(allApplications);
+          setHistory(items);
         }
       }
     } catch (error) {
@@ -44,15 +74,23 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
     }
   };
 
-  const filteredHistory = filter === 'all'
-    ? history
-    : history.filter((item) => item.status === filter);
+  const filteredHistory = history.filter((item) => {
+    if (filter !== 'all' && item.status !== filter) return false;
+    if (dateFrom && item.job.inspection_date && item.job.inspection_date < dateFrom) return false;
+    if (dateTo && item.job.inspection_date && item.job.inspection_date > dateTo) return false;
+    if (filterRegion !== 'all') {
+      const prefs = REGIONS[filterRegion] || [];
+      if (!prefs.includes(item.job.prefecture)) return false;
+    }
+    if (filterPrefecture !== 'all' && item.job.prefecture !== filterPrefecture) return false;
+    if (filterCity && !(item.job.city || '').includes(filterCity)) return false;
+    return true;
+  }).sort((a, b) => (b.job.inspection_date || '').localeCompare(a.job.inspection_date || ''));
 
   const stats = {
     total: history.length,
-    confirmed: history.filter((h) => h.status === 'confirmed').length,
-    rejected: history.filter((h) => h.status === 'rejected').length,
-    pending: history.filter((h) => h.status === 'pending').length,
+    completed: history.filter((h) => h.status === 'completed').length,
+    withdrawn: history.filter((h) => h.status === 'withdrawn').length,
   };
 
   if (loading) {
@@ -68,114 +106,151 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 mb-4">履歴管理</h1>
-        <div className="flex space-x-4">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'all'
-                ? 'bg-slate-700 text-white'
-                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            すべて
-          </button>
-          <button
-            onClick={() => setFilter('confirmed')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'confirmed'
-                ? 'bg-slate-700 text-white'
-                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            確定済み
-          </button>
-          <button
-            onClick={() => setFilter('rejected')}
-            className={`px-4 py-2 rounded-lg ${
-              filter === 'rejected'
-                ? 'bg-slate-700 text-white'
-                : 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-          >
-            辞退履歴
-          </button>
-        </div>
+        <h1 className="text-3xl font-bold text-slate-900">履歴</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8 bg-white rounded-lg shadow p-6">
-        <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white rounded-lg shadow p-6">
           <p className="text-sm text-slate-600 mb-1">総数</p>
           <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
         </div>
-        <div>
-          <p className="text-sm text-slate-600 mb-1">確定済み</p>
-          <p className="text-3xl font-bold text-green-600">{stats.confirmed}</p>
+        <div className="bg-white rounded-lg shadow p-6">
+          <p className="text-sm text-slate-600 mb-1">実施済み</p>
+          <p className="text-3xl font-bold text-green-600">{stats.completed}</p>
         </div>
-        <div>
+        <div className="bg-white rounded-lg shadow p-6">
           <p className="text-sm text-slate-600 mb-1">辞退</p>
-          <p className="text-3xl font-bold text-red-600">{stats.rejected}</p>
-        </div>
-        <div>
-          <p className="text-sm text-slate-600 mb-1">保留中</p>
-          <p className="text-3xl font-bold text-amber-600">{stats.pending}</p>
+          <p className="text-3xl font-bold text-red-600">{stats.withdrawn}</p>
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow">
+        <div className="p-6 border-b border-slate-200">
+          <h2 className="text-xl font-bold text-slate-900 mb-4">履歴一覧</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                title="開始日"
+                max={dateTo || undefined}
+              />
+              <span className="text-slate-500 text-sm">〜</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                title="終了日"
+                min={dateFrom || undefined}
+              />
+            </div>
+            <select
+              value={filterRegion}
+              onChange={(e) => { setFilterRegion(e.target.value); setFilterPrefecture('all'); }}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            >
+              <option value="all">すべての地方</option>
+              {Object.keys(REGIONS).map((region) => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+            <select
+              value={filterPrefecture}
+              onChange={(e) => setFilterPrefecture(e.target.value)}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            >
+              <option value="all">すべての都道府県</option>
+              {(filterRegion === 'all' ? Object.values(REGIONS).flat() : REGIONS[filterRegion] || []).map((pref) => (
+                <option key={pref} value={pref}>{pref}</option>
+              ))}
+            </select>
+            <input
+              type="text"
+              placeholder="市区町村"
+              value={filterCity}
+              onChange={(e) => setFilterCity(e.target.value)}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-32"
+            />
+            <select
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as 'all' | 'completed' | 'withdrawn')}
+              className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            >
+              <option value="all">すべてのステータス</option>
+              <option value="completed">実施済み</option>
+              <option value="withdrawn">辞退</option>
+            </select>
+          </div>
+        </div>
+
         {filteredHistory.length === 0 ? (
-          <div className="p-12 text-center text-slate-500">履歴がありません</div>
+          <div className="p-12 text-center text-slate-500">該当する履歴がありません</div>
         ) : (
           <div className="divide-y divide-slate-200">
             {filteredHistory.map((item) => {
-              const job = item.jobs || item.job;
+              const job = item.job;
+              const statusBadge = item.status === 'completed' ? (
+                <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-700 font-medium inline-flex items-center space-x-1">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>実施済み</span>
+                </span>
+              ) : (
+                <span className="px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-medium inline-flex items-center space-x-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  <span>辞退</span>
+                </span>
+              );
+
               return (
-                <div key={item.id} className="p-6 hover:bg-slate-50 transition-colors">
+                <div
+                  key={item.id}
+                  onClick={() => onSelectJob && onSelectJob(job.id)}
+                  className={`p-6 transition-colors ${onSelectJob ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {job?.job_number && <span className="text-sm font-normal text-slate-500 mr-2">{job.job_number}</span>}
-                          {job?.title}
-                        </h3>
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm ${
-                            item.status === 'confirmed'
-                              ? 'bg-green-100 text-green-700'
-                              : item.status === 'rejected'
-                              ? 'bg-red-100 text-red-700'
-                              : item.status === 'withdrawn'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          {item.status === 'confirmed'
-                            ? '確定済み'
-                            : item.status === 'rejected'
-                            ? '辞退'
-                            : item.status === 'withdrawn'
-                            ? '取り下げ'
-                            : '保留中'}
-                        </span>
+                      <div className="flex items-center space-x-3 mb-3">
+                        {job.job_number && <span className="text-xl font-bold text-slate-900">{job.job_number}</span>}
+                        <h3 className="text-lg font-semibold text-slate-900">{job.title}</h3>
+                        {statusBadge}
                       </div>
-                      {job && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-slate-600">
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4" />
-                            <span>{job.inspection_date}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <MapPin className="w-4 h-4" />
-                            <span>{job.prefecture}{job.city ? ` ${job.city}` : ''}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <DollarSign className="w-4 h-4" />
-                            <span>¥{job.reward?.toLocaleString()}</span>
-                          </div>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm text-slate-600">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{job.inspection_date}</span>
                         </div>
-                      )}
-                      <div className="mt-3 text-sm text-slate-500">
-                        応募日: {new Date(item.created_at).toLocaleDateString()}
+                        <div className="flex items-center space-x-2">
+                          <Clock className="w-4 h-4" />
+                          <span>{job.start_time}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="w-4 h-4" />
+                          <span>{job.prefecture} {job.city || ''}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <JapaneseYen className="w-4 h-4" />
+                          <span className="font-semibold text-slate-900">¥{job.reward?.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {job.accommodation && job.accommodation !== 'none' ? (
+                            <>
+                              <Hotel className="w-4 h-4 text-blue-600" />
+                              <span className="text-blue-600">
+                                {job.accommodation === 'before' ? '宿泊（前泊）' :
+                                 job.accommodation === 'after' ? '宿泊（後泊）' :
+                                 job.accommodation === 'both' ? '宿泊（前後泊）' : '宿泊あり'}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Hotel className="w-4 h-4" />
+                              <span>宿泊なし</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -185,6 +260,10 @@ export function HistoryScreen({ onNavigate }: { onNavigate: (screen: Screen) => 
           </div>
         )}
       </div>
+
+      <p className="mt-4 text-xs text-slate-500">
+        ※ 実施日経過の案件は自動でこちらに表示されます。ファイルの閲覧・追加アップロードは詳細画面から行えます（内容変更不可）。
+      </p>
     </div>
   );
 }

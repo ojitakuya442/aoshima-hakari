@@ -224,6 +224,10 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
       } else {
         setMessages(messagesData);
       }
+
+      if (user) {
+        await messagesApi.markJobAsRead(selectedJobId, user.id);
+      }
     } catch (error) {
       console.error('Failed to load messages:', error);
       setError('メッセージの読み込みに失敗しました');

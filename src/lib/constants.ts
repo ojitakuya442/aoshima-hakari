@@ -9,3 +9,21 @@ export const REGIONS: Record<string, string[]> = {
 };
 
 export const PREFECTURES = Object.values(REGIONS).flat();
+
+export const REGION_COLORS: Record<string, string> = {
+  '北海道・東北': 'bg-sky-500',
+  '関東': 'bg-rose-500',
+  '中部': 'bg-amber-500',
+  '近畿': 'bg-emerald-500',
+  '中国': 'bg-purple-500',
+  '四国': 'bg-orange-500',
+  '九州・沖縄': 'bg-indigo-500',
+};
+
+export function getRegionForPrefecture(prefecture: string | undefined): string | null {
+  if (!prefecture) return null;
+  for (const [region, prefs] of Object.entries(REGIONS)) {
+    if (prefs.includes(prefecture)) return region;
+  }
+  return null;
+}

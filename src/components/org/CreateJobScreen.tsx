@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, organizationsApi, filesApi } from '../../services/api';
-import { AlertCircle, Upload, X, FileText } from 'lucide-react';
+import type { Job } from '../../lib/supabase';
+import { AlertCircle, Upload, X, FileText, Copy, Check } from 'lucide-react';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
@@ -11,12 +12,15 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
   const [error, setError] = useState('');
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [pastJobs, setPastJobs] = useState<Job[]>([]);
+  const [loadingPast, setLoadingPast] = useState(false);
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     inspection_date: '',
     start_time: '',
-    end_time: '',
     location: '',
     prefecture: '東京都',
     city: '',
@@ -24,12 +28,76 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     required_qualifications: '',
     visibility: 'local' as 'local' | 'public',
     inspector_count: '1',
-    accommodation_required: false,
+    accommodation: 'none' as 'none' | 'before' | 'after' | 'both',
+    machine_ssv: '0',
+    machine_sv: '0',
+    machine_other: '0',
+    machine_old: '0',
+    machine_certified: '0',
+    machine_existing: '0',
     recruitment_start_date: '',
     file_access_level: 'public' as 'public' | 'confirmed',
     file_viewable_from: '',
     file_viewable_until: '',
   });
+
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+
+  useEffect(() => {
+    if (!showTemplateModal || !user) return;
+    let cancelled = false;
+    setLoadingPast(true);
+    (async () => {
+      try {
+        const org = await organizationsApi.getByUserId(user.id);
+        if (!org) {
+          if (!cancelled) setPastJobs([]);
+          return;
+        }
+        const jobs = await jobsApi.getByOrganization(org.id);
+        if (cancelled) return;
+        const past = jobs
+          .filter((j) => j.inspection_date && j.inspection_date < todayStr)
+          .sort((a, b) => b.inspection_date.localeCompare(a.inspection_date));
+        setPastJobs(past);
+      } catch (err) {
+        console.error('Failed to load past jobs', err);
+        if (!cancelled) setPastJobs([]);
+      } finally {
+        if (!cancelled) setLoadingPast(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showTemplateModal, user, todayStr]);
+
+  const applyTemplate = (job: Job) => {
+    setFormData((prev) => ({
+      ...prev,
+      title: job.title ?? '',
+      description: job.description ?? '',
+      location: job.location ?? '',
+      prefecture: job.prefecture ?? prev.prefecture,
+      city: job.city ?? '',
+      reward: job.reward != null ? String(job.reward) : '',
+      required_qualifications: job.required_qualifications ?? '',
+      visibility: job.visibility === 'public' ? 'public' : 'local',
+      inspector_count: job.inspector_count != null ? String(job.inspector_count) : '1',
+      accommodation: job.accommodation ?? 'none',
+      machine_ssv: String(job.machine_counts?.ssv ?? 0),
+      machine_sv: String(job.machine_counts?.sv ?? 0),
+      machine_other: String(job.machine_counts?.other ?? 0),
+      machine_old: String(job.machine_counts?.old ?? 0),
+      machine_certified: String(job.machine_counts?.certified ?? 0),
+      machine_existing: String(job.machine_counts?.existing ?? 0),
+    }));
+    setAppliedTemplateId(job.id);
+    setShowTemplateModal(false);
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -71,7 +139,6 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         description: formData.description,
         inspection_date: formData.inspection_date,
         start_time: formData.start_time,
-        end_time: formData.end_time,
         location: formData.location,
         prefecture: formData.prefecture,
         city: formData.city,
@@ -79,7 +146,16 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         required_qualifications: formData.required_qualifications,
         visibility: formData.visibility,
         inspector_count: parseInt(formData.inspector_count),
-        accommodation_required: formData.accommodation_required,
+        accommodation: formData.accommodation,
+        accommodation_required: formData.accommodation !== 'none',
+        machine_counts: {
+          ssv: parseInt(formData.machine_ssv) || 0,
+          sv: parseInt(formData.machine_sv) || 0,
+          other: parseInt(formData.machine_other) || 0,
+          old: parseInt(formData.machine_old) || 0,
+          certified: parseInt(formData.machine_certified) || 0,
+          existing: parseInt(formData.machine_existing) || 0,
+        },
         recruitment_start_date: formData.recruitment_start_date,
         status: formData.recruitment_start_date && new Date(formData.recruitment_start_date) > new Date() ? 'pre-open' : 'open',
       });
@@ -121,7 +197,23 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         >
           ← 戻る
         </button>
-        <h1 className="text-3xl font-bold text-slate-900">新規検定依頼作成</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-bold text-slate-900">新規検定依頼作成</h1>
+          <button
+            type="button"
+            onClick={() => setShowTemplateModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 transition-colors text-sm text-slate-700"
+          >
+            <Copy className="w-4 h-4" />
+            過去案件をテンプレートとして使用
+          </button>
+        </div>
+        {appliedTemplateId && (
+          <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-800">
+            <Check className="w-3.5 h-3.5" />
+            過去案件のテンプレートを反映しました。実施日・開始時間・募集開始日は再入力が必要です。
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-8">
@@ -162,7 +254,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 実施日 <span className="text-red-500">*</span>
@@ -183,18 +275,6 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                 type="time"
                 value={formData.start_time}
                 onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
-                終了時間 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="time"
-                value={formData.end_time}
-                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                 required
               />
@@ -308,22 +388,112 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                 required
               />
             </div>
-            <div className="flex flex-col justify-center">
+            <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 宿泊
               </label>
-              <div className="flex items-center">
-                <label className="flex items-center space-x-2 cursor-pointer">
+              <select
+                value={formData.accommodation}
+                onChange={(e) => setFormData({ ...formData, accommodation: e.target.value as 'none' | 'before' | 'after' | 'both' })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+              >
+                <option value="none">宿泊なし</option>
+                <option value="before">前泊</option>
+                <option value="after">後泊</option>
+                <option value="both">前後泊</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              検定機械台数
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">SSV機</label>
+                <div className="flex items-center space-x-2">
                   <input
-                    type="checkbox"
-                    checked={formData.accommodation_required}
-                    onChange={(e) => setFormData({ ...formData, accommodation_required: e.target.checked })}
-                    className="w-5 h-5 text-slate-700 border-slate-300 rounded focus:ring-2 focus:ring-slate-500"
+                    type="number"
+                    value={formData.machine_ssv}
+                    onChange={(e) => setFormData({ ...formData, machine_ssv: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
                   />
-                  <span className="text-slate-700">宿泊が必要</span>
-                </label>
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">SV機</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={formData.machine_sv}
+                    onChange={(e) => setFormData({ ...formData, machine_sv: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
+                  />
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">他社機</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={formData.machine_other}
+                    onChange={(e) => setFormData({ ...formData, machine_other: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
+                  />
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">旧型機</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={formData.machine_old}
+                    onChange={(e) => setFormData({ ...formData, machine_old: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
+                  />
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4 mt-3">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">内訳：型式指定</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={formData.machine_certified}
+                    onChange={(e) => setFormData({ ...formData, machine_certified: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
+                  />
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">内訳：既存</label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="number"
+                    value={formData.machine_existing}
+                    onChange={(e) => setFormData({ ...formData, machine_existing: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    min="0"
+                  />
+                  <span className="text-sm text-slate-600">台</span>
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              ※ 機械種別はクライアント確認後に確定予定。現状は仮の4種類で表示しています。
+            </p>
           </div>
 
           <div>
@@ -428,6 +598,66 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
           </div>
         </div>
       </form>
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h2 className="text-xl font-bold text-slate-900">過去案件から流用</h2>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                aria-label="閉じる"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto">
+              <p className="text-sm text-slate-600 mb-4">
+                過去2〜3年分の検定実施済み案件を流用できます。実施日・開始時間・募集開始日は新規入力してください。
+              </p>
+              {loadingPast ? (
+                <p className="text-sm text-slate-500 py-8 text-center">読み込み中...</p>
+              ) : pastJobs.length === 0 ? (
+                <p className="text-sm text-slate-500 py-8 text-center">流用できる過去案件がありません。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pastJobs.map((job) => (
+                    <li key={job.id}>
+                      <button
+                        type="button"
+                        onClick={() => applyTemplate(job)}
+                        className="w-full text-left p-4 border border-slate-200 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{job.title}</p>
+                            <p className="text-xs text-slate-500 mt-1">
+                              実施日: {job.inspection_date} ／ {job.prefecture}{job.city}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              報酬: ¥{job.reward?.toLocaleString?.() ?? job.reward} ／ 検定官: {job.inspector_count ?? '-'}名
+                            </p>
+                          </div>
+                          <Copy className="w-4 h-4 text-slate-400 flex-shrink-0 mt-1" />
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm"
+              >
+                閉じる
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

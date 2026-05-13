@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Edit2, Trash2, Plus, X, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Users, Search, Edit2, Trash2, X, ArrowUpDown, Mail, Copy, Check } from 'lucide-react';
 import { REGIONS, PREFECTURES } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'user-management';
@@ -20,7 +20,7 @@ type UserEntry = {
   city?: string;
 };
 
-type ModalMode = 'create' | 'edit' | 'delete' | null;
+type ModalMode = 'invite' | 'edit' | 'delete' | 'invite-sent' | null;
 
 const ORG_OPTIONS = ['青島計量検定センター', '関東総合検定機関', '近畿検定協会'];
 
@@ -64,6 +64,8 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [selectedUser, setSelectedUser] = useState<UserEntry | null>(null);
   const [formData, setFormData] = useState(emptyForm());
+  const [invitationUrl, setInvitationUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   // Derived: prefectures available for selected region
   const availablePrefectures = filterRegion !== 'all' ? (REGIONS[filterRegion] || []) : PREFECTURES;
@@ -76,9 +78,9 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
     }, 400);
   }, []);
 
-  const openCreate = () => {
+  const openInvite = () => {
     setFormData(emptyForm());
-    setModalMode('create');
+    setModalMode('invite');
   };
 
   const openEdit = (u: UserEntry) => {
@@ -95,21 +97,30 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
   const closeModal = () => {
     setModalMode(null);
     setSelectedUser(null);
+    setInvitationUrl('');
+    setCopied(false);
   };
 
-  const handleCreate = () => {
+  const generateInvitationUrl = (email: string) => {
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    return `https://aoshima-hakari.example.com/invite/${token}?email=${encodeURIComponent(email)}`;
+  };
+
+  const handleInvite = () => {
+    const today = new Date().toISOString().split('T')[0];
     const newUser: UserEntry = {
       id: String(Date.now()),
       name: formData.name,
       email: formData.email,
       role: formData.role,
-      registered_at: new Date().toISOString().split('T')[0],
+      registered_at: today,
       ...(formData.role === 'organization'
         ? { affiliated_org: formData.affiliated_org }
         : { region: formData.region, prefecture: formData.prefecture, city: formData.city }),
     };
     setUsers((prev) => [newUser, ...prev]);
-    closeModal();
+    setInvitationUrl(generateInvitationUrl(formData.email));
+    setModalMode('invite-sent');
   };
 
   const handleEdit = () => {
@@ -139,6 +150,16 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
     closeModal();
   };
 
+  const handleCopyInvitation = async () => {
+    try {
+      await navigator.clipboard.writeText(invitationUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      console.error('Copy failed:', e);
+    }
+  };
+
   const toggleSort = (field: 'name' | 'registered_at') => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortField(field); setSortDir('asc'); }
@@ -165,9 +186,9 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold text-slate-900">ユーザー管理</h1>
-        <button onClick={openCreate} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2">
-          <Plus className="w-4 h-4" />
-          <span>新規登録</span>
+        <button onClick={openInvite} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2">
+          <Mail className="w-4 h-4" />
+          <span>ユーザーを招待</span>
         </button>
       </div>
 
@@ -256,7 +277,7 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.role === 'inspector' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full w-fit ${u.role === 'inspector' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
                         {roleLabel(u.role)}
                       </span>
                     </td>
@@ -265,7 +286,9 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
                         ? (u.affiliated_org || '—')
                         : [u.prefecture, u.city].filter(Boolean).join(' ') || '—'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{u.registered_at}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                      {u.registered_at}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end space-x-3">
                         <button onClick={() => openEdit(u)} className="text-indigo-600 hover:text-indigo-900 transition-colors" title="編集"><Edit2 className="w-4 h-4" /></button>
@@ -280,14 +303,23 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
         </div>
       </div>
 
-      {/* ────────── Modal: Create / Edit ────────── */}
-      {(modalMode === 'create' || modalMode === 'edit') && (
+      {/* ────────── Modal: Invite / Edit ────────── */}
+      {(modalMode === 'invite' || modalMode === 'edit') && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
-              <h2 className="text-lg font-bold text-slate-900">{modalMode === 'create' ? '新規ユーザー登録' : 'ユーザー情報を編集'}</h2>
+              <h2 className="text-lg font-bold text-slate-900">{modalMode === 'invite' ? 'ユーザーを招待' : 'ユーザー情報を編集'}</h2>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
             </div>
+
+            {modalMode === 'invite' && (
+              <div className="mb-5 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
+                <p className="font-medium">招待メールを送信します</p>
+                <p className="text-xs mt-1 text-blue-700">
+                  指定したメールアドレス宛に招待リンクを送ります。本人が招待リンクからパスワードを設定するとアカウントが有効化されます。
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               {/* 基本情報 */}
@@ -327,7 +359,7 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
               {/* 検定官: 住所（3段階） */}
               {formData.role === 'inspector' && (
                 <div className="space-y-3 border-t border-slate-100 pt-3">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">住所</p>
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">活動エリア（任意）</p>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">地方</label>
                     <select value={formData.region} onChange={(e) => setFormData({ ...formData, region: e.target.value, prefecture: 'all', city: '' })}
@@ -357,10 +389,58 @@ export function UserManagementScreen({ onNavigate }: { onNavigate: (screen: Scre
 
             <div className="flex justify-end space-x-3 mt-6">
               <button onClick={closeModal} className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm">キャンセル</button>
-              <button onClick={modalMode === 'create' ? handleCreate : handleEdit}
-                disabled={!formData.name || !formData.email}
-                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm disabled:bg-slate-400">
-                {modalMode === 'create' ? '登録する' : '保存する'}
+              <button onClick={modalMode === 'invite' ? handleInvite : handleEdit}
+                disabled={modalMode === 'invite' ? !formData.email : (!formData.name || !formData.email)}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm disabled:bg-slate-400 flex items-center space-x-2">
+                {modalMode === 'invite' && <Mail className="w-4 h-4" />}
+                <span>{modalMode === 'invite' ? '招待を送信' : '保存する'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ────────── Modal: Invitation Sent ────────── */}
+      {modalMode === 'invite-sent' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                <Check className="w-5 h-5 text-green-600" />
+                <span>招待を送信しました</span>
+              </h2>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="mb-4 text-sm text-slate-700">
+              招待メールを送信しました。本人が招待リンクからパスワードを設定するとアカウントが有効化されます。
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-500 mb-1">招待リンク（モック表示）</label>
+              <div className="flex">
+                <input
+                  type="text"
+                  readOnly
+                  value={invitationUrl}
+                  className="flex-1 px-3 py-2 border border-slate-300 rounded-l-lg bg-slate-50 text-xs text-slate-700 font-mono truncate"
+                />
+                <button
+                  onClick={handleCopyInvitation}
+                  className={`px-3 py-2 border border-l-0 border-slate-300 rounded-r-lg text-sm flex items-center space-x-1 transition-colors ${
+                    copied ? 'bg-green-50 text-green-700' : 'bg-white hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'コピー済' : 'コピー'}</span>
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 mt-1">※ 本番ではこのリンクは招待メール内にのみ表示されます。</p>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={closeModal} className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors text-sm">
+                閉じる
               </button>
             </div>
           </div>

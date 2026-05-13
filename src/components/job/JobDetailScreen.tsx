@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, DollarSign, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel, Trash2, Settings, Briefcase, List, MessageSquare, Send } from 'lucide-react';
+import { Calendar, Clock, MapPin, JapaneseYen, FileText, AlertCircle, Download, Upload, ExternalLink, Camera, X, Users, Hotel, Trash2, Settings, Briefcase, List, MessageSquare, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, applicationsApi, inspectorsApi, auditLogsApi, filesApi } from '../../services/api';
 import { supabase } from '../../lib/supabase';
@@ -324,12 +324,19 @@ export function JobDetailScreen({
     );
   }
 
+  const todayStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })();
+  const isPast = !!(job.inspection_date && job.inspection_date < todayStr);
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <button
           onClick={() =>
             onNavigate(
+              isPast ? 'history' :
               profile?.role === 'organization' ? 'org-dashboard' : 'inspector-dashboard'
             )
           }
@@ -339,6 +346,18 @@ export function JobDetailScreen({
         </button>
         <h1 className="text-3xl font-bold text-slate-900">検定業務詳細</h1>
       </div>
+
+      {isPast && (
+        <div className="mb-6 bg-slate-100 border border-slate-300 rounded-lg p-4 flex items-start space-x-3">
+          <AlertCircle className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-slate-800 font-semibold">過去案件（閲覧専用モード）</p>
+            <p className="text-sm text-slate-600 mt-1">
+              実施日（{job.inspection_date}）を経過した案件です。内容変更はできません。ファイルの閲覧・追加アップロードは可能です。
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow p-8 mb-6">
         {error && (
@@ -351,7 +370,7 @@ export function JobDetailScreen({
         <div className="flex justify-between items-start mb-6">
           <div>
             <div className="flex items-center space-x-3 mb-2">
-              {job.job_number && <span className="text-slate-500 font-medium">{job.job_number}</span>}
+              {job.job_number && <span className="text-2xl font-bold text-slate-900">{job.job_number}</span>}
               <h2 className="text-2xl font-bold text-slate-900">{job.title}</h2>
             </div>
             <p className="text-slate-600">{job.organizations?.organization_name}</p>
@@ -383,7 +402,7 @@ export function JobDetailScreen({
               <div>
                 <p className="text-sm text-slate-600">開始時間</p>
                 <p className="font-semibold text-slate-900">
-                  {job.start_time} 〜 {job.end_time}
+                  {job.start_time}
                 </p>
               </div>
             </div>
@@ -406,10 +425,10 @@ export function JobDetailScreen({
               <div>
                 <p className="text-sm text-slate-600">検定機械台数</p>
                 <p className="font-semibold text-slate-900">
-                  SSV機 {job.machine_counts?.ssv || 0}台　SV機 {job.machine_counts?.sv || 0}台　他社機 {job.machine_counts?.other || 0}台　旧型機 {job.machine_counts?.old || 0}台
+                  SSV機 {job.machine_counts?.ssv || 0}台{'　'}SV機 {job.machine_counts?.sv || 0}台{'　'}他社機 {job.machine_counts?.other || 0}台{'　'}旧型機 {job.machine_counts?.old || 0}台
                 </p>
                 <p className="text-sm text-slate-500 mt-1">
-                  （内訳：型式指定 {job.machine_counts?.certified || 0}台　既存 {job.machine_counts?.existing || 0}台）
+                  （内訳：型式指定 {job.machine_counts?.certified || 0}台{'　'}既存 {job.machine_counts?.existing || 0}台）
                 </p>
               </div>
             </div>
@@ -417,10 +436,10 @@ export function JobDetailScreen({
 
           <div className="space-y-4">
             <div className="flex items-start space-x-3">
-              <DollarSign className="w-5 h-5 text-slate-400 mt-0.5" />
+              <JapaneseYen className="w-5 h-5 text-slate-400 mt-0.5" />
               <div>
                 <p className="text-sm text-slate-600">報酬</p>
-                <p className="text-2xl font-bold text-slate-900">
+                <p className="font-semibold text-slate-900">
                   ¥{job.reward.toLocaleString()}
                 </p>
               </div>
@@ -621,7 +640,7 @@ export function JobDetailScreen({
                       <Download className="w-4 h-4" />
                       <span>DL</span>
                     </button>
-                    {profile?.role === 'organization' && (
+                    {profile?.role === 'organization' && !isPast && (
                       <button
                         onClick={() => handleDeleteFile(file.id)}
                         className="px-3 py-2 text-sm border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center space-x-2"
@@ -637,7 +656,7 @@ export function JobDetailScreen({
           </div>
         </div>
 
-        {profile?.role === 'inspector' && job.status === 'open' && (
+        {profile?.role === 'inspector' && job.status === 'open' && !isPast && (
           <div className="border-t border-slate-200 pt-6">
             {hasApplied ? (
               <div>
@@ -698,7 +717,7 @@ export function JobDetailScreen({
         )}
 
         {/* パターン1: 検定官からの問合せ入力 */}
-        {profile?.role === 'inspector' && (
+        {profile?.role === 'inspector' && !isPast && (
           <div className="border-t border-slate-200 pt-6 mt-6">
             <h3 className="font-semibold text-slate-900 mb-3 flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 text-slate-600" />

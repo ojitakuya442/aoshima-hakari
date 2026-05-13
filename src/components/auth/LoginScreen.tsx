@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Building2, AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Building2, AlertCircle, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { LegalDocumentModal, LegalDocType } from './LegalDocumentModal';
+import { InvitationAcceptScreen } from './InvitationAcceptScreen';
 
 export function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -10,8 +12,18 @@ export function LoginScreen() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [legalDoc, setLegalDoc] = useState<LegalDocType | null>(null);
+  const [invitationEmail, setInvitationEmail] = useState<string | null>(null);
 
   const { signIn, resetPassword } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const inviteEmail = params.get('invite');
+    if (inviteEmail) {
+      setInvitationEmail(inviteEmail);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +73,22 @@ export function LoginScreen() {
     }
   };
 
+  if (invitationEmail) {
+    return (
+      <InvitationAcceptScreen
+        invitedEmail={invitationEmail}
+        onComplete={() => {
+          setInvitationEmail(null);
+          window.history.replaceState(null, '', window.location.pathname);
+        }}
+        onBackToLogin={() => {
+          setInvitationEmail(null);
+          window.history.replaceState(null, '', window.location.pathname);
+        }}
+      />
+    );
+  }
+
   if (showResetPassword) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
@@ -76,9 +104,20 @@ export function LoginScreen() {
           </div>
 
           {resetSuccess ? (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-              <p className="text-green-800 text-sm">
-                パスワード再設定用のリンクをメールで送信しました。
+            <div className="space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start space-x-3">
+                <Mail className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-green-800 text-sm font-medium">
+                    パスワード再設定用のリンクをメールで送信しました
+                  </p>
+                  <p className="text-green-700 text-xs mt-1">
+                    {resetEmail} 宛にメールを送信しました。受信箱を確認してください。
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500">
+                メールが届かない場合は、迷惑メールフォルダもご確認ください。それでも届かない場合は管理者にお問い合わせください。
               </p>
             </div>
           ) : (
@@ -124,7 +163,29 @@ export function LoginScreen() {
           >
             ログイン画面に戻る
           </button>
+
+          <div className="pt-4 mt-4 border-t border-slate-200 text-center">
+            <button
+              type="button"
+              onClick={() => setLegalDoc('terms')}
+              className="text-sm text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+            >
+              利用規約
+            </button>
+            <span className="text-slate-400 mx-2">|</span>
+            <button
+              type="button"
+              onClick={() => setLegalDoc('privacy')}
+              className="text-sm text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
+            >
+              プライバシーポリシー
+            </button>
+          </div>
         </div>
+
+        {legalDoc && (
+          <LegalDocumentModal docType={legalDoc} onClose={() => setLegalDoc(null)} />
+        )}
       </div>
     );
   }
@@ -234,20 +295,26 @@ export function LoginScreen() {
           <div className="pt-4 border-t border-slate-200 text-center">
             <button
               type="button"
-              className="text-sm text-slate-600 hover:text-slate-900"
+              onClick={() => setLegalDoc('terms')}
+              className="text-sm text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
             >
               利用規約
             </button>
             <span className="text-slate-400 mx-2">|</span>
             <button
               type="button"
-              className="text-sm text-slate-600 hover:text-slate-900"
+              onClick={() => setLegalDoc('privacy')}
+              className="text-sm text-slate-600 hover:text-slate-900 underline-offset-2 hover:underline"
             >
               プライバシーポリシー
             </button>
           </div>
         </form>
       </div>
+
+      {legalDoc && (
+        <LegalDocumentModal docType={legalDoc} onClose={() => setLegalDoc(null)} />
+      )}
     </div>
   );
 }

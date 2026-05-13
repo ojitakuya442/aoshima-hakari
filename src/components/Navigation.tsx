@@ -1,7 +1,7 @@
-import { Building2, MessageSquare, User, LogOut, History, Users } from 'lucide-react';
+import { Building2, MessageSquare, User, LogOut, History, Users, CalendarDays, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useState, useEffect } from 'react';
-import { notificationsApi } from '../services/api';
+import { messagesApi } from '../services/api';
 
 type Screen =
   | 'org-dashboard'
@@ -12,7 +12,8 @@ type Screen =
   | 'messages'
   | 'profile'
   | 'history'
-  | 'user-management';
+  | 'user-management'
+  | 'calendar';
 
 export function Navigation({
   currentScreen,
@@ -22,24 +23,22 @@ export function Navigation({
   onNavigate: (screen: Screen) => void;
 }) {
   const { profile, signOut, user } = useAuth();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
-      loadUnreadCount();
-    }
-  }, [user]);
-
-  const loadUnreadCount = async () => {
-    // 既存の未読バッジロジックをメッセージや他用途に流用する場合は残しますが、通知自体は削除します
     if (!user) return;
-    try {
-      const count = await notificationsApi.getUnreadCount(user.id);
-      setUnreadCount(count);
-    } catch (error) {
-      console.error('Failed to load unread count:', error);
-    }
-  };
+    const load = async () => {
+      try {
+        const count = await messagesApi.getUnreadCount(user.id);
+        setUnreadMessageCount(count);
+      } catch (error) {
+        console.error('Failed to load unread message count:', error);
+      }
+    };
+    load();
+    const intervalId = window.setInterval(load, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [user, currentScreen]);
 
   const handleSignOut = async () => {
     try {
@@ -69,23 +68,53 @@ export function Navigation({
                     : 'inspector-dashboard'
                 )
               }
-              className="text-slate-600 hover:text-slate-900"
+              className={`hover:text-slate-900 flex items-center space-x-1 ${
+                currentScreen === 'org-dashboard' || currentScreen === 'inspector-dashboard'
+                  ? 'text-slate-900 font-semibold'
+                  : 'text-slate-600'
+              }`}
             >
-              ダッシュボード
+              <LayoutDashboard className="w-5 h-5" />
+              <span>ダッシュボード</span>
             </button>
-            <button
-              onClick={() => onNavigate('messages')}
-              className="text-slate-600 hover:text-slate-900 flex items-center space-x-1"
-            >
-              <MessageSquare className="w-5 h-5" />
-              <span>メッセージ</span>
-            </button>
+            {profile?.role === 'organization' && (
+              <button
+                onClick={() => onNavigate('calendar')}
+                className={`hover:text-slate-900 flex items-center space-x-1 ${
+                  currentScreen === 'calendar' ? 'text-slate-900 font-semibold' : 'text-slate-600'
+                }`}
+              >
+                <CalendarDays className="w-5 h-5" />
+                <span>カレンダー</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('history')}
-              className="text-slate-600 hover:text-slate-900 flex items-center space-x-1"
+              className={`hover:text-slate-900 flex items-center space-x-1 ${
+                currentScreen === 'history' ? 'text-slate-900 font-semibold' : 'text-slate-600'
+              }`}
             >
               <History className="w-5 h-5" />
               <span>履歴</span>
+            </button>
+            <button
+              onClick={() => onNavigate('messages')}
+              className={`hover:text-slate-900 flex items-center space-x-1 relative ${
+                currentScreen === 'messages' ? 'text-slate-900 font-semibold' : 'text-slate-600'
+              }`}
+            >
+              <span className="relative inline-flex">
+                <MessageSquare className="w-5 h-5" />
+                {unreadMessageCount > 0 && (
+                  <span
+                    aria-label={`未読メッセージ${unreadMessageCount}件`}
+                    className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-red-500 text-white text-[0.65rem] font-semibold leading-none"
+                  >
+                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                  </span>
+                )}
+              </span>
+              <span>メッセージ</span>
             </button>
             {profile?.role === 'organization' && (
               <button

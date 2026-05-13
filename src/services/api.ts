@@ -198,6 +198,44 @@ export const messagesApi = {
       unsubscribe: () => undefined,
     };
   },
+
+  async getAccessibleJobIds(userId: string): Promise<string[]> {
+    await delay();
+    const profile = mockData.profiles.find((p) => p.id === userId);
+    if (!profile) return [];
+    if (profile.role === 'organization') {
+      const orgIds = mockData.organizations.filter((o) => o.user_id === userId).map((o) => o.id);
+      return mockData.jobs.filter((j) => orgIds.includes(j.organization_id)).map((j) => j.id);
+    }
+    const inspector = mockData.inspectors.find((ins) => ins.user_id === userId);
+    if (!inspector) return [];
+    return mockData.applications
+      .filter((app) => app.inspector_id === inspector.id)
+      .map((app) => app.job_id);
+  },
+
+  async getUnreadCount(userId: string) {
+    await delay();
+    const accessibleJobIds = await this.getAccessibleJobIds(userId);
+    return mockData.messages.filter(
+      (m) =>
+        accessibleJobIds.includes(m.job_id) &&
+        m.sender_id !== userId &&
+        !(m.read_by || []).includes(userId)
+    ).length;
+  },
+
+  async markJobAsRead(jobId: string, userId: string) {
+    await delay();
+    mockData.messages.forEach((m) => {
+      if (m.job_id === jobId) {
+        const readBy = m.read_by || [];
+        if (!readBy.includes(userId)) {
+          m.read_by = [...readBy, userId];
+        }
+      }
+    });
+  },
 };
 
 export const notificationsApi = {

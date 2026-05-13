@@ -12,6 +12,7 @@ import { CreateJobScreen } from './components/org/CreateJobScreen';
 import { JobDetailScreen } from './components/job/JobDetailScreen';
 import { ApplicationsScreen } from './components/org/ApplicationsScreen';
 import { UserManagementScreen } from './components/org/UserManagementScreen';
+import { CalendarScreen } from './components/calendar/CalendarScreen';
 
 type Screen =
   | 'org-dashboard'
@@ -22,7 +23,8 @@ type Screen =
   | 'messages'
   | 'profile'
   | 'history'
-  | 'user-management';
+  | 'user-management'
+  | 'calendar';
 
 function App() {
   const { user, profile, loading } = useAuth();
@@ -84,9 +86,16 @@ function App() {
       case 'profile':
         return <ProfileScreen onNavigate={handleNavigate} />;
       case 'history':
-        return <HistoryScreen onNavigate={handleNavigate} />;
+        return <HistoryScreen onNavigate={handleNavigate} onSelectJob={(jobId) => handleNavigate('job-detail', jobId)} />;
+      case 'calendar':
+        return (
+          <CalendarScreen
+            onNavigate={handleNavigate}
+            onSelectJob={(jobId) => handleNavigate('job-detail', jobId)}
+          />
+        );
       case 'user-management':
-        // @ts-ignore
+        // @ts-expect-error - UserManagementScreen has its own type definition
         return <UserManagementScreen onNavigate={handleNavigate} />;
       default:
         return profile.role === 'organization' ? (

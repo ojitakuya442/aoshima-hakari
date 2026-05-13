@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Calendar as CalendarIcon, Clock, MapPin, Users, Hotel, Briefcase, Check, FileText, List } from 'lucide-react';
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, Users, Hotel, Briefcase, Check, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, organizationsApi, applicationsApi } from '../../services/api';
-import { JobCalendar } from './JobCalendar';
 import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
@@ -19,14 +18,11 @@ export function OrgDashboard({
   const [jobApplicationCounts, setJobApplicationCounts] = useState<Record<string, number>>({});
   const [stats, setStats] = useState({ draft: 0, open: 0, confirmed: 0 });
   const [loading, setLoading] = useState(true);
-  const [showCalendar, setShowCalendar] = useState(false);
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  
-  const [selectedDateJobs, setSelectedDateJobs] = useState<any[] | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(todayStr);
 
-  const [filterDate, setFilterDate] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
   const [filterPrefecture, setFilterPrefecture] = useState('all');
   const [filterCity, setFilterCity] = useState('');
@@ -44,14 +40,14 @@ export function OrgDashboard({
       const org = await organizationsApi.getByUserId(user.id);
       if (org) {
         const jobsData = await jobsApi.getByOrganization(org.id);
-        const fetchedJobs = jobsData || [];
+        const allJobs = jobsData || [];
+        const fetchedJobs = allJobs.filter((j: any) => !j.inspection_date || j.inspection_date >= todayStr);
         setJobs(fetchedJobs);
-        setSelectedDateJobs(fetchedJobs.filter(j => j.inspection_date === todayStr));
 
         const counts: Record<string, number> = {};
         let totalPending = 0;
 
-        for (const job of jobsData || []) {
+        for (const job of fetchedJobs) {
           const apps = await applicationsApi.getByJob(job.id);
           const pendingApps = apps?.filter((a) => a.status === 'pending').length || 0;
           counts[job.id] = pendingApps;
@@ -60,9 +56,9 @@ export function OrgDashboard({
 
         setJobApplicationCounts(counts);
 
-        const draftCount = jobsData?.filter((j) => j.status === 'draft').length || 0;
-        const openCount = jobsData?.filter((j) => j.status === 'open').length || 0;
-        const confirmedCount = jobsData?.filter((j) => j.status === 'confirmed').length || 0;
+        const draftCount = fetchedJobs.filter((j: any) => j.status === 'draft').length || 0;
+        const openCount = fetchedJobs.filter((j: any) => j.status === 'open').length || 0;
+        const confirmedCount = fetchedJobs.filter((j: any) => j.status === 'confirmed').length || 0;
 
         setStats({ draft: draftCount, open: openCount, confirmed: confirmedCount });
       }
@@ -71,11 +67,6 @@ export function OrgDashboard({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDateSelect = (date: string, dateJobs: any[]) => {
-    setSelectedDate(date);
-    setSelectedDateJobs(dateJobs);
   };
 
   const handleViewApplications = (jobId: string) => {
@@ -95,32 +86,10 @@ export function OrgDashboard({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8 flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-slate-900">検定依頼管理</h1>
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">検定依頼管理</h1>
+        </div>
         <div className="flex space-x-3">
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            <button
-              onClick={() => setShowCalendar(false)}
-              className={`px-4 py-2 rounded-md flex items-center space-x-2 text-sm font-medium transition-colors ${
-                !showCalendar
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
-            >
-              <List className="w-4 h-4" />
-              <span>一覧表示</span>
-            </button>
-            <button
-              onClick={() => setShowCalendar(true)}
-              className={`px-4 py-2 rounded-md flex items-center space-x-2 text-sm font-medium transition-colors ${
-                showCalendar
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-              }`}
-            >
-              <CalendarIcon className="w-4 h-4" />
-              <span>カレンダー表示</span>
-            </button>
-          </div>
           <button
             onClick={() => onNavigate('org-create-job')}
             className="px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-2"
@@ -131,8 +100,7 @@ export function OrgDashboard({
         </div>
       </div>
 
-      {!showCalendar && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -169,78 +137,30 @@ export function OrgDashboard({
           </div>
         </div>
       </div>
-      )}
 
-      {showCalendar && (
-        <div className="mb-8">
-          <JobCalendar jobs={jobs} onSelectDate={handleDateSelect} selectedDate={selectedDate} />
-          {selectedDateJobs && (
-            <div className="mt-6 bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">
-                {selectedDate} の検定
-              </h3>
-              {selectedDateJobs.length > 0 ? (
-                <div className="space-y-3">
-                  {selectedDateJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      className="flex items-center justify-between p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      <div>
-                        <h4 className="font-semibold text-slate-900">
-                          {job.job_number && <span className="text-sm text-slate-500 mr-2">{job.job_number}</span>}
-                          {job.title}
-                        </h4>
-                        <p className="text-sm text-slate-600">
-                          {job.start_time} - {job.end_time} | {job.location}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm ${
-                            job.status === 'confirmed'
-                              ? 'bg-green-100 text-green-700'
-                              : job.status === 'open'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {job.status === 'open' ? '募集中' : job.status === 'confirmed' ? '確定済み' : job.status === 'draft' ? '募集前' : job.status}
-                        </span>
-                        <button
-                          onClick={() => onSelectJob(job.id)}
-                          className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-sm"
-                        >
-                          詳細
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500 border-2 border-dashed border-slate-200 rounded-lg">
-                  <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                  <p>この日の検定依頼はありません</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {!showCalendar && (
-        <div className="bg-white rounded-lg shadow">
+      <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b border-slate-200">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-            <h2 className="text-xl font-bold text-slate-900">検定依頼一覧</h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-                title="日付で絞り込み"
-              />
+          <h2 className="text-xl font-bold text-slate-900 mb-4">検定依頼一覧</h2>
+          <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={filterDateFrom}
+                  onChange={(e) => setFilterDateFrom(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  title="開始日"
+                  max={filterDateTo || undefined}
+                />
+                <span className="text-slate-500 text-sm">〜</span>
+                <input
+                  type="date"
+                  value={filterDateTo}
+                  onChange={(e) => setFilterDateTo(e.target.value)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  title="終了日"
+                  min={filterDateFrom || undefined}
+                />
+              </div>
               <select
                 value={filterRegion}
                 onChange={(e) => {
@@ -291,7 +211,6 @@ export function OrgDashboard({
                 <option value="inspection_asc">開催日が近い順</option>
                 <option value="inspection_desc">開催日が遠い順</option>
               </select>
-            </div>
           </div>
         </div>
         {jobs.length === 0 ? (
@@ -301,7 +220,8 @@ export function OrgDashboard({
         ) : (
           <div className="divide-y divide-slate-200">
             {jobs.filter(job => {
-              if (filterDate && job.inspection_date !== filterDate) return false;
+              if (filterDateFrom && (!job.inspection_date || job.inspection_date < filterDateFrom)) return false;
+              if (filterDateTo && (!job.inspection_date || job.inspection_date > filterDateTo)) return false;
               if (filterRegion !== 'all') {
                 const prefecturesInRegion = REGIONS[filterRegion] || [];
                 if (!prefecturesInRegion.includes(job.prefecture)) return false;
@@ -350,8 +270,8 @@ export function OrgDashboard({
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center space-x-3 mb-3">
+                        {job.job_number && <span className="text-xl font-bold text-slate-900">{job.job_number}</span>}
                         <h3 className="text-lg font-semibold text-slate-900">
-                          {job.job_number && <span className="text-sm text-slate-500 mr-2">{job.job_number}</span>}
                           {job.title}
                         </h3>
                         {getStatusBadge()}
@@ -363,7 +283,7 @@ export function OrgDashboard({
                         </div>
                         <div className="flex items-center space-x-2">
                           <Clock className="w-4 h-4" />
-                          <span>{job.start_time} - {job.end_time}</span>
+                          <span>{job.start_time}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <MapPin className="w-4 h-4" />
@@ -392,7 +312,7 @@ export function OrgDashboard({
                         </div>
                       </div>
                     </div>
-                    <div className="flex space-x-2 w-56 justify-end shrink-0 ml-4">
+                    <div className="flex space-x-2 justify-end shrink-0 ml-4 w-32">
                       {applicationCount > 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleViewApplications(job.id); }}
@@ -402,12 +322,6 @@ export function OrgDashboard({
                           <span>応募確認</span>
                         </button>
                       )}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onSelectJob(job.id); }}
-                        className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                      >
-                        詳細
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -416,7 +330,6 @@ export function OrgDashboard({
           </div>
         )}
       </div>
-      )}
     </div>
   );
 }

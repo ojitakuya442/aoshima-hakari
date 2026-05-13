@@ -1,42 +1,59 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { REGIONS, REGION_COLORS, getRegionForPrefecture } from '../../lib/constants';
 
 type Job = {
   id: string;
   title: string;
+  job_number?: string;
   inspection_date: string;
   status: string;
   prefecture?: string;
+  city?: string;
 };
 
 const getColorForJob = (job: Job) => {
-  const colors = [
-    'bg-rose-500', 'bg-blue-500', 'bg-emerald-500', 
-    'bg-amber-500', 'bg-purple-500', 'bg-cyan-500',
-    'bg-indigo-500', 'bg-teal-500', 'bg-orange-500'
-  ];
-  let hash = 0;
-  const str = job.id || job.title;
-  for (let i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return colors[Math.abs(hash) % colors.length];
+  const region = getRegionForPrefecture(job.prefecture);
+  if (region && REGION_COLORS[region]) return REGION_COLORS[region];
+  return 'bg-slate-500';
 };
 
 export function JobCalendar({
   jobs,
   onSelectDate,
   selectedDate,
+  defaultRegion,
 }: {
   jobs: Job[];
   onSelectDate: (date: string, jobs: Job[]) => void;
   selectedDate?: string | null;
+  defaultRegion?: string;
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isEditingHolidays, setIsEditingHolidays] = useState(false);
   const [customHolidays, setCustomHolidays] = useState<Record<string, string>>({});
   const [holidayModal, setHolidayModal] = useState<{ isOpen: boolean; dateStr: string; } | null>(null);
   const [holidayName, setHolidayName] = useState('休業日');
+
+  const [filterRegion, setFilterRegion] = useState<string>(defaultRegion || 'all');
+  const [filterPrefecture, setFilterPrefecture] = useState<string>('all');
+  const [filterCity, setFilterCity] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+
+  useEffect(() => {
+    if (defaultRegion) setFilterRegion(defaultRegion);
+  }, [defaultRegion]);
+
+  const filteredJobs = jobs.filter((job) => {
+    if (filterRegion !== 'all') {
+      const prefs = REGIONS[filterRegion] || [];
+      if (!prefs.includes(job.prefecture || '')) return false;
+    }
+    if (filterPrefecture !== 'all' && job.prefecture !== filterPrefecture) return false;
+    if (filterCity && !(job.city || '').includes(filterCity)) return false;
+    if (filterStatus !== 'all' && job.status !== filterStatus) return false;
+    return true;
+  });
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -47,7 +64,7 @@ export function JobCalendar({
   };
 
   const getJobsForDate = (dateStr: string) => {
-    return jobs.filter((job) => job.inspection_date === dateStr);
+    return filteredJobs.filter((job) => job.inspection_date === dateStr);
   };
 
   const previousMonth = () => {
@@ -72,7 +89,7 @@ export function JobCalendar({
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center space-x-4">
           <h2 className="text-xl font-bold text-slate-900">{monthName}</h2>
           <button
@@ -99,6 +116,55 @@ export function JobCalendar({
           >
             <ChevronRight className="w-5 h-5 text-slate-600" />
           </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-slate-200">
+        <select
+          value={filterRegion}
+          onChange={(e) => { setFilterRegion(e.target.value); setFilterPrefecture('all'); }}
+          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+        >
+          <option value="all">すべての地方</option>
+          {Object.keys(REGIONS).map((region) => (
+            <option key={region} value={region}>{region}</option>
+          ))}
+        </select>
+        <select
+          value={filterPrefecture}
+          onChange={(e) => setFilterPrefecture(e.target.value)}
+          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+        >
+          <option value="all">すべての都道府県</option>
+          {(filterRegion === 'all' ? Object.values(REGIONS).flat() : REGIONS[filterRegion] || []).map((pref) => (
+            <option key={pref} value={pref}>{pref}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          placeholder="市区町村"
+          value={filterCity}
+          onChange={(e) => setFilterCity(e.target.value)}
+          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-32"
+        />
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+        >
+          <option value="all">すべてのステータス</option>
+          <option value="draft">募集前</option>
+          <option value="open">募集中</option>
+          <option value="confirmed">確定済み</option>
+          <option value="completed">実施済み</option>
+        </select>
+        <div className="ml-auto flex flex-wrap gap-2 text-[10px] text-slate-600">
+          {Object.entries(REGION_COLORS).map(([region, color]) => (
+            <span key={region} className="inline-flex items-center space-x-1">
+              <span className={`inline-block w-3 h-3 rounded ${color}`}></span>
+              <span>{region}</span>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -172,12 +238,12 @@ export function JobCalendar({
               {dayJobs.length > 0 && !isEditingHolidays && (
                 <div className="flex-1 flex flex-col gap-1 w-full overflow-hidden mt-1">
                   {dayJobs.slice(0, 2).map(job => (
-                    <div 
-                      key={job.id} 
-                      className={`text-[10px] leading-tight px-1.5 py-1 rounded truncate text-white ${getColorForJob(job)}`}
+                    <div
+                      key={job.id}
+                      className={`text-[11px] leading-tight px-1.5 py-1 rounded text-white ${getColorForJob(job)}`}
                       title={job.title}
                     >
-                      {job.title}
+                      <div className="truncate">{job.title}</div>
                     </div>
                   ))}
                   {dayJobs.length > 2 && (
