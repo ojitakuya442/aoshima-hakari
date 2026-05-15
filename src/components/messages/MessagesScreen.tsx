@@ -597,7 +597,7 @@ export function MessagesScreen({ onNavigate }: { onNavigate: (screen: Screen) =>
                       {jobApplicants.map((app: any) => (
                         <option key={app.id} value={app.inspector_id}>
                           {app.inspectors?.profiles?.full_name || '名前不明'}
-                          {app.status === 'confirmed' ? ' ✓ 確定済み' : app.status === 'pending' ? ' （審査中）' : ''}
+                          {app.status === 'confirmed' ? ' ✓ 確定済' : app.status === 'pending' ? ' （審査中）' : ''}
                         </option>
                       ))}
                     </select>

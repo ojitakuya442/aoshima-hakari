@@ -184,7 +184,7 @@ export function ApplicationsScreen({
                       ? 'bg-slate-100 text-slate-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {app.status === 'withdrawn' ? '取り下げ' : '辞退済み'}
+                    {app.status === 'withdrawn' ? '取り下げ' : '辞退済'}
                   </span>
                 </div>
               </div>
@@ -245,7 +245,7 @@ export function ApplicationsScreen({
                       </button>
                     </>
                   ) : (
-                    <span className="px-3 py-1.5 rounded-full text-sm bg-green-100 text-green-700">確定済み</span>
+                    <span className="px-3 py-1.5 rounded-full text-sm bg-green-100 text-green-700">確定済</span>
                   )}
                 </div>
               </div>

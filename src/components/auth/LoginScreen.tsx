@@ -196,7 +196,7 @@ export function LoginScreen() {
         <div className="text-center mb-8">
           <Building2 className="w-16 h-16 mx-auto text-slate-700 mb-4" />
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            検定マッチング
+            検定員募集：情報サイト
           </h1>
           <p className="text-slate-600">ログイン</p>
         </div>

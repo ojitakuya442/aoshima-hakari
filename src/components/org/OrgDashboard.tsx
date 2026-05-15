@@ -41,7 +41,11 @@ export function OrgDashboard({
       if (org) {
         const jobsData = await jobsApi.getByOrganization(org.id);
         const allJobs = jobsData || [];
-        const fetchedJobs = allJobs.filter((j: any) => !j.inspection_date || j.inspection_date >= todayStr);
+        const fetchedJobs = allJobs.filter((j: any) => {
+          if (j.status === 'cancelled' || j.status === 'completed') return false;
+          if (j.inspection_date && j.inspection_date < todayStr) return false;
+          return true;
+        });
         setJobs(fetchedJobs);
 
         const counts: Record<string, number> = {};
@@ -128,7 +132,7 @@ export function OrgDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">確定済み</p>
+              <p className="text-sm text-slate-600 mb-1">確定済</p>
               <p className="text-3xl font-bold text-slate-900">{stats.confirmed}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -200,7 +204,7 @@ export function OrgDashboard({
                 <option value="all">すべてのステータス</option>
                 <option value="draft">募集前</option>
                 <option value="open">募集中</option>
-                <option value="confirmed">確定済み</option>
+                <option value="confirmed">確定済</option>
               </select>
               <select
                 value={filterSort}
@@ -241,28 +245,22 @@ export function OrgDashboard({
                 if (job.status === 'confirmed') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-700 font-medium">
-                      確定済み
+                      確定済
                     </span>
                   );
-                } else if (job.status === 'open') {
+                }
+                if (job.status === 'open') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-700 font-medium">
                       募集中
                     </span>
                   );
-                } else if (job.status === 'draft') {
-                  return (
-                    <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
-                      募集前
-                    </span>
-                  );
-                } else {
-                  return (
-                    <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
-                      {job.status}
-                    </span>
-                  );
                 }
+                return (
+                  <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
+                    募集前
+                  </span>
+                );
               };
 
               return (

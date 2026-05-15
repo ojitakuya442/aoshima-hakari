@@ -104,7 +104,7 @@ export function CalendarScreen({
                     <div className="flex items-center space-x-2">
                       {isPast && (
                         <span className="px-2 py-0.5 rounded-full text-xs bg-slate-200 text-slate-700">
-                          実施済み
+                          実施済
                         </span>
                       )}
                       <span
@@ -114,18 +114,18 @@ export function CalendarScreen({
                             : job.status === 'open'
                             ? 'bg-blue-100 text-blue-700'
                             : job.status === 'completed'
-                            ? 'bg-slate-100 text-slate-700'
+                            ? 'bg-green-100 text-green-700'
                             : 'bg-slate-100 text-slate-700'
                         }`}
                       >
                         {job.status === 'open'
                           ? '募集中'
                           : job.status === 'confirmed'
-                          ? '確定済み'
+                          ? '確定済'
                           : job.status === 'draft'
                           ? '募集前'
                           : job.status === 'completed'
-                          ? '完了'
+                          ? '実施済'
                           : job.status === 'cancelled'
                           ? '中止'
                           : job.status}

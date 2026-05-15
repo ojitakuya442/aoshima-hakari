@@ -1,23 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, JapaneseYen, Users, Hotel, Check, AlertCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, JapaneseYen, Hotel } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { applicationsApi, inspectorsApi, jobsApi, organizationsApi } from '../../services/api';
 import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'inspector-dashboard' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
 
+type HistoryStatus = 'completed' | 'withdrawn' | 'cancelled';
+
 type HistoryItem = {
   id: string;
   job: any;
-  status: 'completed' | 'withdrawn';
+  status: HistoryStatus;
   appliedAt?: string;
 };
 
 export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen: Screen) => void; onSelectJob?: (jobId: string) => void }) {
   const { user, profile } = useAuth();
+  const isOrg = profile?.role === 'organization';
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'completed' | 'withdrawn'>('all');
+  const [filter, setFilter] = useState<'all' | HistoryStatus>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [filterRegion, setFilterRegion] = useState('all');
@@ -60,9 +63,14 @@ export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen
           const jobs = await jobsApi.getByOrganization(org.id);
           const items: HistoryItem[] = [];
           for (const job of jobs || []) {
+            if (job.status === 'cancelled') {
+              items.push({ id: job.id, job, status: 'cancelled' });
+              continue;
+            }
             const past = job.inspection_date && job.inspection_date < todayStr;
-            if (!past) continue;
-            items.push({ id: job.id, job, status: 'completed' });
+            if (past) {
+              items.push({ id: job.id, job, status: 'completed' });
+            }
           }
           setHistory(items);
         }
@@ -91,6 +99,7 @@ export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen
     total: history.length,
     completed: history.filter((h) => h.status === 'completed').length,
     withdrawn: history.filter((h) => h.status === 'withdrawn').length,
+    cancelled: history.filter((h) => h.status === 'cancelled').length,
   };
 
   if (loading) {
@@ -115,13 +124,20 @@ export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen
           <p className="text-3xl font-bold text-slate-900">{stats.total}</p>
         </div>
         <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-slate-600 mb-1">実施済み</p>
+          <p className="text-sm text-slate-600 mb-1">実施済</p>
           <p className="text-3xl font-bold text-green-600">{stats.completed}</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-6">
-          <p className="text-sm text-slate-600 mb-1">辞退</p>
-          <p className="text-3xl font-bold text-red-600">{stats.withdrawn}</p>
-        </div>
+        {isOrg ? (
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm text-slate-600 mb-1">中止</p>
+            <p className="text-3xl font-bold text-slate-600">{stats.cancelled}</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow p-6">
+            <p className="text-sm text-slate-600 mb-1">辞退</p>
+            <p className="text-3xl font-bold text-red-600">{stats.withdrawn}</p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow">
@@ -176,12 +192,16 @@ export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen
             />
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as 'all' | 'completed' | 'withdrawn')}
+              onChange={(e) => setFilter(e.target.value as 'all' | HistoryStatus)}
               className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
             >
               <option value="all">すべてのステータス</option>
-              <option value="completed">実施済み</option>
-              <option value="withdrawn">辞退</option>
+              <option value="completed">実施済</option>
+              {isOrg ? (
+                <option value="cancelled">中止</option>
+              ) : (
+                <option value="withdrawn">辞退</option>
+              )}
             </select>
           </div>
         </div>
@@ -193,14 +213,16 @@ export function HistoryScreen({ onNavigate, onSelectJob }: { onNavigate: (screen
             {filteredHistory.map((item) => {
               const job = item.job;
               const statusBadge = item.status === 'completed' ? (
-                <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-700 font-medium inline-flex items-center space-x-1">
-                  <Check className="w-3.5 h-3.5" />
-                  <span>実施済み</span>
+                <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-700 font-medium">
+                  実施済
+                </span>
+              ) : item.status === 'cancelled' ? (
+                <span className="px-3 py-1 rounded-full text-sm bg-slate-100 text-slate-700 font-medium">
+                  中止
                 </span>
               ) : (
-                <span className="px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-medium inline-flex items-center space-x-1">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  <span>辞退</span>
+                <span className="px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-medium">
+                  辞退
                 </span>
               );
 

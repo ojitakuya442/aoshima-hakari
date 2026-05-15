@@ -1,10 +1,43 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { jobsApi, organizationsApi, filesApi } from '../../services/api';
 import type { Job } from '../../lib/supabase';
 import { AlertCircle, Upload, X, FileText, Copy, Check } from 'lucide-react';
+import { REGIONS } from '../../lib/constants';
 
 type Screen = 'org-dashboard' | 'org-create-job' | 'org-applications' | 'job-detail' | 'messages' | 'profile' | 'history' | 'notifications';
+
+const TIME_OPTIONS_15MIN: string[] = (() => {
+  const opts: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return opts;
+})();
+
+const roundUpTo15Min = (timeStr: string): string => {
+  const [h, m] = timeStr.split(':').map(Number);
+  const rounded = Math.ceil(m / 15) * 15;
+  if (rounded === 60) {
+    if (h >= 23) return '23:45';
+    return `${String(h + 1).padStart(2, '0')}:00`;
+  }
+  return `${String(h).padStart(2, '0')}:${String(rounded).padStart(2, '0')}`;
+};
+
+const splitDateTimeLocal = (value: string): { date: string; time: string } => {
+  if (!value) return { date: '', time: '' };
+  const [date, time] = value.split('T');
+  return { date: date || '', time: (time || '').slice(0, 5) };
+};
+
+const joinDateTimeLocal = (date: string, time: string): string => {
+  if (!date && !time) return '';
+  if (!date) return '';
+  return `${date}T${time || '00:00'}`;
+};
 
 export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) => void }) {
   const { user } = useAuth();
@@ -16,6 +49,12 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
   const [pastJobs, setPastJobs] = useState<Job[]>([]);
   const [loadingPast, setLoadingPast] = useState(false);
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+  const [templateSearch, setTemplateSearch] = useState('');
+  const [templateRegion, setTemplateRegion] = useState('all');
+  const [templatePrefecture, setTemplatePrefecture] = useState('all');
+  const [templateCity, setTemplateCity] = useState('');
+  const [templateDateFrom, setTemplateDateFrom] = useState('');
+  const [templateDateTo, setTemplateDateTo] = useState('');
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -36,6 +75,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     machine_certified: '0',
     machine_existing: '0',
     recruitment_start_date: '',
+    recruitment_start_time: '09:00',
     file_access_level: 'public' as 'public' | 'confirmed',
     file_viewable_from: '',
     file_viewable_until: '',
@@ -45,6 +85,14 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
+  const currentTimeStr = (() => {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  })();
+  const recruitmentMinTime = formData.recruitment_start_date === todayStr ? roundUpTo15Min(currentTimeStr) : '';
+  const recruitmentTimeOptions = recruitmentMinTime
+    ? TIME_OPTIONS_15MIN.filter((t) => t >= recruitmentMinTime)
+    : TIME_OPTIONS_15MIN;
 
   useEffect(() => {
     if (!showTemplateModal || !user) return;
@@ -74,6 +122,37 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
       cancelled = true;
     };
   }, [showTemplateModal, user, todayStr]);
+
+  const filteredPastJobs = useMemo(() => {
+    const search = templateSearch.trim().toLowerCase();
+    return pastJobs.filter((job) => {
+      if (search) {
+        const haystack = [job.title, job.description, job.job_number]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      if (templateRegion !== 'all') {
+        const prefs = REGIONS[templateRegion] || [];
+        if (!prefs.includes(job.prefecture || '')) return false;
+      }
+      if (templatePrefecture !== 'all' && job.prefecture !== templatePrefecture) return false;
+      if (templateCity && !(job.city || '').includes(templateCity.trim())) return false;
+      if (templateDateFrom && (!job.inspection_date || job.inspection_date < templateDateFrom)) return false;
+      if (templateDateTo && (!job.inspection_date || job.inspection_date > templateDateTo)) return false;
+      return true;
+    });
+  }, [pastJobs, templateSearch, templateRegion, templatePrefecture, templateCity, templateDateFrom, templateDateTo]);
+
+  const resetTemplateFilters = () => {
+    setTemplateSearch('');
+    setTemplateRegion('all');
+    setTemplatePrefecture('all');
+    setTemplateCity('');
+    setTemplateDateFrom('');
+    setTemplateDateTo('');
+  };
 
   const applyTemplate = (job: Job) => {
     setFormData((prev) => ({
@@ -130,6 +209,11 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
     try {
       if (!user) throw new Error('Not authenticated');
 
+      const recruitmentStart = new Date(`${formData.recruitment_start_date}T${formData.recruitment_start_time}`);
+      if (!(recruitmentStart > new Date())) {
+        throw new Error('募集開始日時は現在より後の日時を指定してください');
+      }
+
       const org = await organizationsApi.getByUserId(user.id);
       if (!org) throw new Error('Organization not found');
 
@@ -157,7 +241,8 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
           existing: parseInt(formData.machine_existing) || 0,
         },
         recruitment_start_date: formData.recruitment_start_date,
-        status: formData.recruitment_start_date && new Date(formData.recruitment_start_date) > new Date() ? 'pre-open' : 'open',
+        recruitment_start_time: formData.recruitment_start_time,
+        status: 'pre-open',
       });
 
       if (!job) throw new Error('案件の作成に失敗しました');
@@ -211,7 +296,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         {appliedTemplateId && (
           <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-xs text-blue-800">
             <Check className="w-3.5 h-3.5" />
-            過去案件のテンプレートを反映しました。実施日・開始時間・募集開始日は再入力が必要です。
+            過去案件のテンプレートを反映しました。実施日・開始時間・募集開始日時は再入力が必要です。
           </div>
         )}
       </div>
@@ -239,20 +324,46 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              募集開始日 <span className="text-sm font-normal text-slate-500">（予約する場合のみ指定）</span>
-            </label>
-            <input
-              type="date"
-              value={formData.recruitment_start_date}
-              onChange={(e) => setFormData({ ...formData, recruitment_start_date: e.target.value })}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
-            />
-            <p className="mt-1 text-sm text-slate-500">
-              指定した日付までは「募集前」となり、指定日になると自動でお知らせが一斉送信され募集が開始されます。
-            </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                募集開始日 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={formData.recruitment_start_date}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  const minTime = nextDate === todayStr ? roundUpTo15Min(currentTimeStr) : '';
+                  const nextTime = minTime && formData.recruitment_start_time < minTime
+                    ? minTime
+                    : formData.recruitment_start_time;
+                  setFormData({ ...formData, recruitment_start_date: nextDate, recruitment_start_time: nextTime });
+                }}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                min={todayStr}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                募集開始時間 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.recruitment_start_time}
+                onChange={(e) => setFormData({ ...formData, recruitment_start_time: e.target.value })}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                required
+              >
+                {recruitmentTimeOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          <p className="-mt-3 text-sm text-slate-500">
+            現在より後の日時のみ指定できます。指定日時になると自動でお知らせが一斉送信され、募集が開始されます。
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -271,13 +382,17 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 開始時間 <span className="text-red-500">*</span>
               </label>
-              <input
-                type="time"
+              <select
                 value={formData.start_time}
                 onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
                 required
-              />
+              >
+                <option value="" disabled>選択してください</option>
+                {TIME_OPTIONS_15MIN.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -555,23 +670,59 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   閲覧開始日時
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.file_viewable_from}
-                  onChange={(e) => setFormData({ ...formData, file_viewable_from: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                />
+                {(() => {
+                  const { date, time } = splitDateTimeLocal(formData.file_viewable_from);
+                  return (
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setFormData({ ...formData, file_viewable_from: joinDateTimeLocal(e.target.value, time) })}
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                      />
+                      <select
+                        value={time}
+                        onChange={(e) => setFormData({ ...formData, file_viewable_from: joinDateTimeLocal(date, e.target.value) })}
+                        disabled={!date}
+                        className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="">--:--</option>
+                        {TIME_OPTIONS_15MIN.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
                   閲覧終了日時
                 </label>
-                <input
-                  type="datetime-local"
-                  value={formData.file_viewable_until}
-                  onChange={(e) => setFormData({ ...formData, file_viewable_until: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
-                />
+                {(() => {
+                  const { date, time } = splitDateTimeLocal(formData.file_viewable_until);
+                  return (
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={date}
+                        onChange={(e) => setFormData({ ...formData, file_viewable_until: joinDateTimeLocal(e.target.value, time) })}
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white"
+                      />
+                      <select
+                        value={time}
+                        onChange={(e) => setFormData({ ...formData, file_viewable_until: joinDateTimeLocal(date, e.target.value) })}
+                        disabled={!date}
+                        className="px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent bg-white disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="">--:--</option>
+                        {TIME_OPTIONS_15MIN.map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="md:col-span-2 text-sm text-slate-500 mt-[-8px]">
                 ※ 未指定の場合は、案件作成時点から無期限で閲覧可能になります。<br/>
@@ -593,7 +744,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
               disabled={loading || uploadingFiles}
               className="px-6 py-3 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-colors disabled:bg-slate-400"
             >
-              {uploadingFiles ? 'ファイルアップロード中...' : loading ? '作成中...' : formData.recruitment_start_date ? '募集を予約して作成' : '案件を作成して募集を開始'}
+              {uploadingFiles ? 'ファイルアップロード中...' : loading ? '作成中...' : '募集を予約して作成'}
             </button>
           </div>
         </div>
@@ -603,7 +754,7 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h2 className="text-xl font-bold text-slate-900">過去案件から流用</h2>
+              <h2 className="text-xl font-bold text-slate-900">過去案件参照</h2>
               <button
                 onClick={() => setShowTemplateModal(false)}
                 className="p-2 hover:bg-slate-100 rounded-full transition-colors"
@@ -614,15 +765,85 @@ export function CreateJobScreen({ onNavigate }: { onNavigate: (screen: Screen) =
             </div>
             <div className="px-6 py-4 overflow-y-auto">
               <p className="text-sm text-slate-600 mb-4">
-                過去2〜3年分の検定実施済み案件を流用できます。実施日・開始時間・募集開始日は新規入力してください。
+                過去の検定依頼案件を参照できます。また、実施場所・実施日などから絞り込むことも可能です。
               </p>
+              {!loadingPast && pastJobs.length > 0 && (
+                <div className="mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
+                  <input
+                    type="text"
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder="検定業務名・案件番号で検索"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={templateRegion}
+                      onChange={(e) => { setTemplateRegion(e.target.value); setTemplatePrefecture('all'); }}
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    >
+                      <option value="all">すべての地方</option>
+                      {Object.keys(REGIONS).map((region) => (
+                        <option key={region} value={region}>{region}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={templatePrefecture}
+                      onChange={(e) => setTemplatePrefecture(e.target.value)}
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                    >
+                      <option value="all">すべての都道府県</option>
+                      {(templateRegion === 'all' ? Object.values(REGIONS).flat() : REGIONS[templateRegion] || []).map((pref) => (
+                        <option key={pref} value={pref}>{pref}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      value={templateCity}
+                      onChange={(e) => setTemplateCity(e.target.value)}
+                      placeholder="市区町村"
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent w-32"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-500">実施日</span>
+                    <input
+                      type="date"
+                      value={templateDateFrom}
+                      onChange={(e) => setTemplateDateFrom(e.target.value)}
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      max={templateDateTo || undefined}
+                    />
+                    <span className="text-slate-500 text-sm">〜</span>
+                    <input
+                      type="date"
+                      value={templateDateTo}
+                      onChange={(e) => setTemplateDateTo(e.target.value)}
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                      min={templateDateFrom || undefined}
+                    />
+                    <button
+                      type="button"
+                      onClick={resetTemplateFilters}
+                      className="ml-auto text-xs text-slate-600 hover:text-slate-900 underline"
+                    >
+                      絞り込みをリセット
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {filteredPastJobs.length} / {pastJobs.length} 件
+                  </p>
+                </div>
+              )}
               {loadingPast ? (
                 <p className="text-sm text-slate-500 py-8 text-center">読み込み中...</p>
               ) : pastJobs.length === 0 ? (
                 <p className="text-sm text-slate-500 py-8 text-center">流用できる過去案件がありません。</p>
+              ) : filteredPastJobs.length === 0 ? (
+                <p className="text-sm text-slate-500 py-8 text-center">該当する過去案件がありません。絞り込み条件を変更してください。</p>
               ) : (
                 <ul className="space-y-2">
-                  {pastJobs.map((job) => (
+                  {filteredPastJobs.map((job) => (
                     <li key={job.id}>
                       <button
                         type="button"

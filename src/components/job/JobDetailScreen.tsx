@@ -375,17 +375,46 @@ export function JobDetailScreen({
             </div>
             <p className="text-slate-600">{job.organizations?.organization_name}</p>
           </div>
-          <span
-            className={`px-4 py-2 rounded-full text-sm font-medium ${
-              job.status === 'open'
-                ? 'bg-blue-100 text-blue-700'
-                : job.status === 'closed'
-                ? 'bg-slate-100 text-slate-700'
-                : 'bg-green-100 text-green-700'
-            }`}
-          >
-            {job.status === 'open' ? '募集中' : job.status === 'closed' ? '募集終了' : '完了'}
-          </span>
+          {(() => {
+            const d = new Date();
+            const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const isPast = job.inspection_date && job.inspection_date < todayStr;
+
+            let label: string;
+            let cls: string;
+
+            if (profile?.role === 'inspector') {
+              if (applicationStatus === 'pending') {
+                label = '選考中'; cls = 'bg-amber-100 text-amber-700';
+              } else if (applicationStatus === 'confirmed') {
+                label = isPast ? '実施済' : '確定済';
+                cls = 'bg-green-100 text-green-700';
+              } else if (applicationStatus === 'withdrawn' || applicationStatus === 'rejected') {
+                label = '辞退'; cls = 'bg-red-100 text-red-700';
+              } else {
+                label = '募集中'; cls = 'bg-blue-100 text-blue-700';
+              }
+            } else if (job.status === 'cancelled') {
+              label = '中止'; cls = 'bg-slate-100 text-slate-700';
+            } else if (isPast || job.status === 'completed') {
+              label = '実施済'; cls = 'bg-green-100 text-green-700';
+            } else {
+              const m: Record<string, { label: string; cls: string }> = {
+                draft: { label: '募集前', cls: 'bg-slate-100 text-slate-700' },
+                open: { label: '募集中', cls: 'bg-blue-100 text-blue-700' },
+                confirmed: { label: '確定済', cls: 'bg-green-100 text-green-700' },
+              };
+              const e = m[job.status as string];
+              if (e) { label = e.label; cls = e.cls; }
+              else { label = job.status as string; cls = 'bg-slate-100 text-slate-700'; }
+            }
+
+            return (
+              <span className={`px-4 py-2 rounded-full text-sm font-medium ${cls}`}>
+                {label}
+              </span>
+            );
+          })()}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -662,7 +691,7 @@ export function JobDetailScreen({
               <div>
                 {applicationStatus === 'confirmed' ? (
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-green-800 font-semibold">確定済みです</p>
+                    <p className="text-green-800 font-semibold">確定済です</p>
                     <p className="text-sm text-green-700 mt-1">検定機関から承認されました</p>
                   </div>
                 ) : applicationStatus === 'rejected' ? (

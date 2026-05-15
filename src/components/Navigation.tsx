@@ -55,7 +55,7 @@ export function Navigation({
           <div className="flex items-center space-x-2">
             <Building2 className="w-8 h-8 text-slate-700" />
             <span className="text-xl font-bold text-slate-900">
-              検定マッチング
+              検定員募集：情報サイト
             </span>
           </div>
 

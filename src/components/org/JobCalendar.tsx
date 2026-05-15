@@ -155,8 +155,8 @@ export function JobCalendar({
           <option value="all">すべてのステータス</option>
           <option value="draft">募集前</option>
           <option value="open">募集中</option>
-          <option value="confirmed">確定済み</option>
-          <option value="completed">実施済み</option>
+          <option value="confirmed">確定済</option>
+          <option value="completed">実施済</option>
         </select>
         <div className="ml-auto flex flex-wrap gap-2 text-[10px] text-slate-600">
           {Object.entries(REGION_COLORS).map(([region, color]) => (

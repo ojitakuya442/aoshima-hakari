@@ -23,7 +23,6 @@ export function InspectorDashboard({
   const [filterCity, setFilterCity] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterSort, setFilterSort] = useState('created_desc');
-  const [stats, setStats] = useState({ open: 0, confirmed: 0 });
   const [applicationStatuses, setApplicationStatuses] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -43,19 +42,11 @@ export function InspectorDashboard({
 
       if (inspector) {
         const applicationsData = await applicationsApi.getByInspector(inspector.id);
-        const pendingCount = applicationsData?.filter((a) => a.status === 'pending').length || 0;
-        const confirmedCount = applicationsData?.filter((a) => a.status === 'confirmed').length || 0;
-
         const statuses: Record<string, string> = {};
         applicationsData?.forEach((a: any) => {
           statuses[a.job_id] = a.status;
         });
         setApplicationStatuses(statuses);
-
-        const openCount = (jobsData || []).filter((job: any) => job.status === 'open').length;
-        const confirmedJobCount = (jobsData || []).filter((job: any) => job.status === 'confirmed').length;
-
-        setStats({ open: openCount, confirmed: confirmedJobCount });
       }
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -69,7 +60,7 @@ export function InspectorDashboard({
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
 
-  const filteredJobs = jobs.filter((job) => {
+  const matchesBaseFilters = (job: any): boolean => {
     if (filterDateFrom && (!job.inspection_date || job.inspection_date < filterDateFrom)) return false;
     if (filterDateTo && (!job.inspection_date || job.inspection_date > filterDateTo)) return false;
     if (filterRegion !== 'all') {
@@ -79,17 +70,35 @@ export function InspectorDashboard({
     if (filterPrefecture !== 'all' && job.prefecture !== filterPrefecture) return false;
     if (filterCity && !job.city?.includes(filterCity)) return false;
     if (job.status === 'draft') return false;
-    if (filterStatus !== 'all' && job.status !== filterStatus) return false;
-    if (filterStatus === 'all' && ['completed', 'cancelled'].includes(job.status)) return false;
+    if (['completed', 'cancelled'].includes(job.status)) return false;
     if (job.inspection_date && job.inspection_date < todayStr) return false;
-    if (applicationStatuses[job.id] === 'rejected') return false;
+    if (['rejected', 'withdrawn'].includes(applicationStatuses[job.id])) return false;
     return true;
-  }).sort((a, b) => {
-    if (filterSort === 'inspection_asc') return a.inspection_date.localeCompare(b.inspection_date);
-    if (filterSort === 'inspection_desc') return b.inspection_date.localeCompare(a.inspection_date);
-    if (filterSort === 'created_desc') return b.created_at.localeCompare(a.created_at);
-    return 0;
-  });
+  };
+
+  const matchesStatusFilter = (job: any, status: string): boolean => {
+    if (status === 'all') return true;
+    const appStatus = applicationStatuses[job.id];
+    if (status === 'open') return !appStatus;
+    return appStatus === status;
+  };
+
+  const baseFilteredJobs = jobs.filter(matchesBaseFilters);
+
+  const stats = {
+    open: baseFilteredJobs.filter((j) => matchesStatusFilter(j, 'open')).length,
+    pending: baseFilteredJobs.filter((j) => matchesStatusFilter(j, 'pending')).length,
+    confirmed: baseFilteredJobs.filter((j) => matchesStatusFilter(j, 'confirmed')).length,
+  };
+
+  const filteredJobs = baseFilteredJobs
+    .filter((j) => matchesStatusFilter(j, filterStatus))
+    .sort((a, b) => {
+      if (filterSort === 'inspection_asc') return a.inspection_date.localeCompare(b.inspection_date);
+      if (filterSort === 'inspection_desc') return b.inspection_date.localeCompare(a.inspection_date);
+      if (filterSort === 'created_desc') return b.created_at.localeCompare(a.created_at);
+      return 0;
+    });
 
   if (loading) {
     return (
@@ -107,7 +116,7 @@ export function InspectorDashboard({
         <h1 className="text-3xl font-bold text-slate-900">検定官ダッシュボード</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -123,7 +132,19 @@ export function InspectorDashboard({
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-600 mb-1">確定済み</p>
+              <p className="text-sm text-slate-600 mb-1">選考中</p>
+              <p className="text-3xl font-bold text-slate-900">{stats.pending}</p>
+            </div>
+            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+              <Clock className="w-6 h-6 text-amber-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-600 mb-1">確定済</p>
               <p className="text-3xl font-bold text-slate-900">{stats.confirmed}</p>
             </div>
             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
@@ -194,7 +215,8 @@ export function InspectorDashboard({
               >
                 <option value="all">すべてのステータス</option>
                 <option value="open">募集中</option>
-                <option value="confirmed">確定済み</option>
+                <option value="pending">選考中</option>
+                <option value="confirmed">確定済</option>
               </select>
               <select
                 value={filterSort}
@@ -219,19 +241,13 @@ export function InspectorDashboard({
                 if (applicationStatus === 'confirmed') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-green-100 text-green-700 font-medium">
-                      確定済み
+                      確定済
                     </span>
                   );
                 } else if (applicationStatus === 'pending') {
                   return (
                     <span className="px-3 py-1 rounded-full text-sm bg-amber-100 text-amber-700 font-medium">
-                      応募待ち
-                    </span>
-                  );
-                } else if (applicationStatus === 'rejected') {
-                  return (
-                    <span className="px-3 py-1 rounded-full text-sm bg-red-100 text-red-700 font-medium">
-                      辞退済み
+                      選考中
                     </span>
                   );
                 } else {
